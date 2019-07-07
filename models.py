@@ -6,9 +6,9 @@ from model_utils import shaps_to_probs
 
 def get_vanilla_nn_classifier(n_classes, n_features):
     model = keras.models.Sequential()
-    model.add(keras.layers.Dense(units=128, activation='relu', input_dim=n_features))
-    model.add(keras.layers.Dense(units=n_classes, activation='softmax'))
-    model.compile('adam', 'categorical_crossentropy', metrics=['recall', 'precision'])
+    model.add(keras.layers.Dense(units=128, activation="relu", input_dim=n_features))
+    model.add(keras.layers.Dense(units=n_classes, activation="softmax"))
+    model.compile("adam", "categorical_crossentropy", metrics=["accuracy"])
     model.summary()
     return model
 
@@ -40,9 +40,10 @@ def evaluate_random_classifier(expected_logits, y_true, n_clones=1000):
     :param n_clones:
     :return:
     """
+    y_true = np.asarray(y_true)
     n_samples = len(y_true)
-    n_classes = len(expected_logits)
-    base_probs = np.exp(expected_logits)
+    n_classes = expected_logits.size
+    base_probs = np.exp(expected_logits).ravel()
     base_probs /= base_probs.sum()
     random_preds = np.random.choice(np.arange(n_classes), p=base_probs, size=(n_samples, n_clones))
     targets = np.tile(y_true.reshape((-1, 1)), (1, n_clones))

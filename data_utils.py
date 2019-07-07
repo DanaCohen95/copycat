@@ -5,7 +5,7 @@ from tensorflow.keras.utils import to_categorical
 from sklearn.model_selection import train_test_split
 
 
-def load_costa_rica_dataset():
+def load_costa_rica_dataset(plot_class_hist=False):
     # read csv
     p = r"data\costa-rican-household-poverty-prediction\train.csv"
     raw_df = pd.read_csv(p)
@@ -23,22 +23,24 @@ def load_costa_rica_dataset():
     y = df['Target'] - 1
 
     # class 3 is VERY common, remove most of its samples.
-    y.hist()
-    plt.title("Class Histogram")
+    if plot_class_hist:
+        y.hist()
+        plt.title("Class Histogram")
 
     label_most_common = y.value_counts().idxmax()
     count_second_most_common = y.value_counts().sort_values().iloc[-2]
 
-    idx_common, = (y == label_most_common).nonzero()
+    idx_common = y.index.values[(y.values == label_most_common).nonzero()]
     np.random.shuffle(idx_common)
     idx_drop = idx_common[count_second_most_common:]
 
     X.drop(idx_drop, axis="rows", inplace=True)
     y.drop(idx_drop, axis="rows", inplace=True)
 
-    y.hist(width=0.2)
-    plt.legend(["before balancing", "after balancing"], loc="best")
-    plt.show(block=False)
+    if plot_class_hist:
+        y.hist(width=0.2)
+        plt.legend(["before balancing", "after balancing"], loc="best")
+        plt.show(block=False)
 
     return X, y
 

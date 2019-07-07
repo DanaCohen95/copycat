@@ -28,9 +28,9 @@ def shaps_to_probs(shaps, expected_logits):
     """
     logit_offsets = tf.reduce_sum(shaps, axis=2)
     logits = logit_offsets + expected_logits
-    logits = logits - tf.reduce_min(logits, axis=1, keep_dims=True)
+    logits = logits - tf.reduce_min(logits, axis=1, keepdims=True)
     probs = tf.exp(logits)
-    probs = probs / tf.reduce_sum(probs, axis=1, keep_dims=True)
+    probs = probs / tf.reduce_sum(probs, axis=1, keepdims=True)
     return probs
 
 
