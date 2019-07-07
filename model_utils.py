@@ -2,21 +2,11 @@ import tensorflow as tf
 import numpy as np
 
 
-def weighted_MSE_loss(y_true, y_pred, weights, axis):
-    # expand the weight tensor for broadcasting
-    ndim = tf.shape(tf.shape(y_pred))[0]
-    weights_shape = tf.concat(0, [tf.ones([axis], tf.int32), [-1], tf.ones([ndim - axis - 1], tf.int32)])
-    weights = tf.reshape(weights, weights_shape)
-
-    # calculate weighted MSE
+def weighted_MSE_loss(y_true, y_pred, weights):
     squared_error = (y_true - y_pred) ** 2
-    squared_error = tf.Print(squared_error, ["weights shape: ", tf.shape(weights)])
-    squared_error = tf.Print(squared_error, ["squared error shape: ", tf.shape(squared_error)])
     weighted_squared_error = weights * squared_error
     weighted_MSE = tf.reduce_mean(weighted_squared_error, axis=[1, 2])
     weighted_MSE = tf.reshape(weighted_MSE, (-1,))
-    weighted_MSE = tf.Print(weighted_MSE, ["final weighted MSE loss shape: ", tf.shape(weighted_MSE)])
-
     return weighted_MSE
 
 
@@ -28,9 +18,9 @@ def shaps_to_probs(shaps, expected_logits):
     """
     logit_offsets = tf.reduce_sum(shaps, axis=2)
     logits = logit_offsets + expected_logits
-    logits = logits - tf.reduce_min(logits, axis=1, keep_dims=True)
+    logits = logits - tf.reduce_min(logits, axis=1, keepdims=True)
     probs = tf.exp(logits)
-    probs = probs / tf.reduce_sum(probs, axis=1, keep_dims=True)
+    probs = probs / tf.reduce_sum(probs, axis=1, keepdims=True)
     return probs
 
 
@@ -39,11 +29,11 @@ def test_weighted_MSE_loss():
     t_y_true = tf.placeholder(tf.float32)
     t_y_pred = tf.placeholder(tf.float32)
     t_weights = tf.placeholder(tf.float32)
-    loss_func = lambda y_true, y_pred: weighted_MSE_loss(y_true, y_pred, t_weights, axis=1)
+    loss_func = lambda y_true, y_pred: weighted_MSE_loss(y_true, y_pred, t_weights)
     t_res = loss_func(t_y_true, t_y_pred)
     np_res = sess.run(t_res, feed_dict={t_y_true: np.random.rand(2, 4, 6),
                                         t_y_pred: np.random.rand(2, 4, 6),
-                                        t_weights: np.random.rand(4)})
+                                        t_weights: np.random.rand(1, 4, 1)})
     print(np_res)
 
 
@@ -70,3 +60,8 @@ def test_shaps_to_probs(xgb_probs=None, shap_values=None, expected_logits=None):
     if xgb_probs is not None and shap_values is not None and expected_logits is not None:
         shap_probs = sess.run(t_res, feed_dict={t_shaps: shap_values, t_expected_logits: expected_logits})
         print(np.allclose(shap_probs, xgb_probs))
+
+
+if __name__ == '__main__':
+    test_shaps_to_probs()
+    test_weighted_MSE_loss()

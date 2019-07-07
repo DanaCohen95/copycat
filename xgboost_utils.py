@@ -20,7 +20,9 @@ def evaluate_xgboost_classifier(xgb_model, X_valid, y_valid):
 
 def calculate_shap_values(xgb_model, X):
     explainer = shap.TreeExplainer(xgb_model)
+    explainer.shap_values(np.ones((1, X.shape[1])))
     expected_logits = np.array(explainer.expected_value)[np.newaxis, :]
+
     shap_values = explainer.shap_values(X)
     shap_values = np.stack(shap_values, axis=1)
     return shap_values, expected_logits
