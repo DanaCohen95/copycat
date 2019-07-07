@@ -9,6 +9,7 @@ def fit_xgboost_classifier(X_train, y_train):
     warnings.filterwarnings("ignore", category=DeprecationWarning)
     xgb_model = XGBClassifier(max_depth=5, n_estimators=30, learning_rate=0.1, objective="multi:softmax")
     xgb_model.fit(X_train, y_train)
+    print("finish fitting xgboost")
     return xgb_model
 
 

@@ -56,6 +56,15 @@ def prepare_data(X, y):
             X_train, X_valid, y_train, y_valid,
             y_train_onehot, y_valid_onehot)
 
+def load_sefe_drive_dataset():
+    df = pd.read_csv("safe_driver/train.csv")
+    df = df.drop(["ps_ind_05_cat","ps_ind_14","ps_ind_01","ps_car_04_cat","ps_car_09_cat","ps_calc_12"], axis=1)
+
+
+    X = df.drop(['target'], axis=1).iloc[:, :10]
+    y = df['target'].astype(int)
+    return X,y
+
 
 if __name__ == '__main__':
     load_costa_rica_dataset()
