@@ -54,9 +54,16 @@ def prepare_data(X, y):
     y_train_onehot = to_categorical(y_train)
     y_valid_onehot = to_categorical(y_valid)
 
+    class_counts = y_train.value_counts().sort_index().values
+    class_weights = 1. / class_counts
+    class_weights /= class_weights.sum() / float(n_classes)
+    class_weights = class_weights.reshape((1, -1, 1))
+    class_weights = class_weights.astype(np.float32)
+
     return (n_samples, n_features, n_classes,
             X_train, X_valid, y_train, y_valid,
-            y_train_onehot, y_valid_onehot)
+            y_train_onehot, y_valid_onehot,
+            class_weights)
 
 
 if __name__ == '__main__':

@@ -1,7 +1,7 @@
 from tensorflow import keras
 import numpy as np
 from sklearn.metrics import classification_report
-from model_utils import shaps_to_probs
+from model_utils import shaps_to_probs, weighted_MSE_loss
 
 
 def get_vanilla_nn_classifier(n_classes, n_features):
@@ -14,7 +14,8 @@ def get_vanilla_nn_classifier(n_classes, n_features):
 
 
 def get_student_nn_classifier(n_classes, n_features, expected_logits,
-                              use_shap_loss=True, use_target_loss=True):
+                              use_shap_loss=True, use_target_loss=True,
+                              class_weights=None):
     assert use_shap_loss or use_target_loss, "at least one of 'use_shap_loss', 'use_target_loss' must be True"
 
     l_input = keras.layers.Input(shape=(n_features,), name="input")
@@ -26,8 +27,15 @@ def get_student_nn_classifier(n_classes, n_features, expected_logits,
 
     model = keras.models.Model(inputs=l_input, outputs=[l_score, l_shaps])
     model.summary()
+
+    if class_weights is None:
+        shap_loss = "mean_squared_error"
+    else:
+        def shap_loss(y_true, y_pred):
+            return weighted_MSE_loss(y_true, y_pred, weights=class_weights)
+
     model.compile(optimizer="adam",
-                  loss=["categorical_crossentropy", "mean_squared_error"],
+                  loss=["categorical_crossentropy", shap_loss],
                   loss_weights=[float(use_target_loss), float(use_shap_loss)],
                   metrics={"score": ["accuracy"]})
     return model

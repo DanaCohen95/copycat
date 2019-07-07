@@ -4,20 +4,25 @@ from xgboost_utils import fit_xgboost_classifier, calculate_shap_values
 import numpy as np
 from sklearn.metrics import classification_report
 
+use_weighted_shap_loss = False
 model_type = "student"
 assert model_type in ["student", "vanilla"]
 
 X, y = load_costa_rica_dataset()
 (n_samples, n_features, n_classes,
  X_train, X_valid, y_train, y_valid,
- y_train_onehot, y_valid_onehot) = prepare_data(X, y)
+ y_train_onehot, y_valid_onehot,
+ class_weights) = prepare_data(X, y)
+
+if not use_weighted_shap_loss:
+    class_weights = None
 
 xgb_model = fit_xgboost_classifier(X_train, y_train)
 shap_values_train, expected_logits = calculate_shap_values(xgb_model, X_train)
 shap_values_valid, _ = calculate_shap_values(xgb_model, X_valid)
 
 if model_type == "student":
-    model = get_student_nn_classifier(n_classes, n_features, expected_logits)
+    model = get_student_nn_classifier(n_classes, n_features, expected_logits, class_weights=class_weights)
 
     model.fit(X_train.values, [y_train_onehot, shap_values_train],
               validation_data=(X_valid.values, [y_valid_onehot, shap_values_valid]),
