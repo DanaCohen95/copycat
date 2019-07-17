@@ -66,14 +66,26 @@ def prepare_data(X, y):
             class_weights)
 
 def load_sefe_drive_dataset():
-    df = pd.read_csv("safe_driver/train.csv")
+    df = pd.read_csv("data/safe_driver/train.csv")
     df = df.drop(["ps_ind_05_cat","ps_ind_14","ps_ind_01","ps_car_04_cat","ps_car_09_cat","ps_calc_12"], axis=1)
 
 
-    X = df.drop(['target'], axis=1).iloc[:, :10]
+    X = df.drop(['target'], axis=1).iloc[:, :]
     y = df['target'].astype(int)
     return X,y
 
 
-if __name__ == '__main__':
-    load_costa_rica_dataset()
+def load_otto_dataset():
+    df = pd.read_csv("data/otto_dataset/train.csv")
+    X = df.drop(['target','id'], axis=1).iloc[:, :]
+    y = df['target'].str.split('_', expand=True)[1].astype(int)-1
+    return X,y
+
+def load_dataset(dataset_name):
+    print (f"loading {dataset_name} dataset")
+    if dataset_name is 'costa_rica':
+        return load_costa_rica_dataset()
+    if dataset_name is 'safe_drive':
+        return load_sefe_drive_dataset()
+    if dataset_name is 'otto':
+        return load_otto_dataset()
