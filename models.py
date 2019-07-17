@@ -65,7 +65,8 @@ def get_student_nn_classifier(n_classes: int,
 
 def evaluate_random_classifier(expected_logits: np.ndarray,
                                y_true: Union[np.ndarray, pd.Series],
-                               n_clones: int = 1000):
+                               n_clones: int = 1000
+                               ) -> None:
     """
     Prints a classification_report for a random classifier, which randomly chooses labels
     for samples according to a non-uniform probability distribution.
@@ -90,7 +91,7 @@ def evaluate_random_classifier(expected_logits: np.ndarray,
     print(classification_report(np.ravel(targets), np.ravel(random_preds)))
 
 
-def example_evaluate_random_classifier():
+def example_evaluate_random_classifier() -> None:
     """ compare a random classifier  """
     from data_utils import load_costa_rica_dataset, prepare_data
     from xgboost_utils import fit_xgboost_classifier, calculate_shap_values, evaluate_xgboost_classifier
@@ -117,4 +118,4 @@ def example_evaluate_random_classifier():
 
 
 if __name__ == '__main__':
-    test_evaluate_random_classifier()
+    example_evaluate_random_classifier()

@@ -3,10 +3,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 from tensorflow.keras.utils import to_categorical
 from sklearn.model_selection import train_test_split
+from typing import Tuple
 
 
 def load_costa_rica_dataset(plot_class_hist: bool = False
-                            ) -> (pd.DataFrame, pd.Series):
+                            ) -> Tuple[pd.DataFrame, pd.Series]:
     """
     Load the Costa Rica Poverty Prediction classification dataset.
     Choose specific features and balance the classes.
@@ -59,10 +60,10 @@ def load_costa_rica_dataset(plot_class_hist: bool = False
 
 def prepare_data(X: pd.DataFrame,
                  y: pd.Series
-                 ) -> (int, int, int,
-                       pd.DataFrame, pd.Series, pd.DataFrame, pd.Series,
-                       np.ndarray, np.ndarray,
-                       np.ndarray):
+                 ) -> Tuple[int, int, int,
+                            pd.DataFrame, pd.Series, pd.DataFrame, pd.Series,
+                            np.ndarray, np.ndarray,
+                            np.ndarray]:
     """
     Split data to train set and validation set.
     Calculate data measures.

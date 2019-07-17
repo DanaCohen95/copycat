@@ -45,7 +45,7 @@ def shaps_to_probs(shaps: tf.Tensor,
     return probs
 
 
-def test_weighted_MSE_loss_technical():
+def test_weighted_MSE_loss_technical() -> None:
     """ technical test for the weighted_MSE_loss tensorflow function """
     sess = tf.Session()
     t_y_true = tf.placeholder(tf.float32)
@@ -60,7 +60,7 @@ def test_weighted_MSE_loss_technical():
     print()
 
 
-def test_shaps_to_probs_technical():
+def test_shaps_to_probs_technical() -> None:
     """ technical test for the shaps_to_probs tensorflow function """
     sess = tf.Session()
 
@@ -76,7 +76,7 @@ def test_shaps_to_probs_technical():
     print()
 
 
-def test_shaps_to_probs_with_data():
+def test_shaps_to_probs_with_data() -> None:
     """
     test whether the shaps_to_probs tensorflow function actually calculates the correct
     class probabilities given actual shap values

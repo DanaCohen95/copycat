@@ -4,6 +4,7 @@ import shap
 from sklearn.metrics import classification_report
 import numpy as np
 import pandas as pd
+from typing import Tuple
 
 
 def fit_xgboost_classifier(X: pd.DataFrame,
@@ -18,7 +19,8 @@ def fit_xgboost_classifier(X: pd.DataFrame,
 
 def evaluate_xgboost_classifier(xgb_model: XGBClassifier,
                                 X: pd.DataFrame,
-                                y: pd.Series):
+                                y: pd.Series
+                                ) -> None:
     """ evaluate an XGBoost classifier and print a classification report """
     preds = xgb_model.predict(X)
     print(classification_report(y.values, preds))
@@ -26,7 +28,7 @@ def evaluate_xgboost_classifier(xgb_model: XGBClassifier,
 
 def calculate_shap_values(xgb_model: XGBClassifier,
                           X: pd.DataFrame
-                          ) -> (np.ndarray, np.ndarray):
+                          ) -> Tuple[np.ndarray, np.ndarray]:
     """
     Calculate SHAP values for an XGBoost multiclass classifier using a shap TreeExplainer.
 
