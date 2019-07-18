@@ -11,7 +11,7 @@ def fit_xgboost_classifier(X: pd.DataFrame,
                            y: pd.Series
                            ) -> XGBClassifier:
     """ create & fit an XGBoost tree-booster classifier for multiclass data """
-    warnings.filterwarnisngs("ignore", category=DeprecationWarning)
+    warnings.filterwarnings("ignore", category=DeprecationWarning)
     xgb_model = XGBClassifier(max_depth=5, n_estimators=30, learning_rate=0.1, objective="multi:softmax")
     xgb_model.fit(X, y)
     return xgb_model

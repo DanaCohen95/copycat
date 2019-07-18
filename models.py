@@ -23,7 +23,8 @@ def get_student_nn_classifier(n_classes: int,
                               expected_logits: np.ndarray,
                               use_shap_loss: bool = True,
                               use_score_loss: bool = True,
-                              class_weights: np.ndarray = None
+                              class_weights: np.ndarray = None,
+                              print_summary: bool = True,
                               ) -> keras.Model:
     """
     Create a shap-value-mimicking neural network for multiclass classification
@@ -48,7 +49,9 @@ def get_student_nn_classifier(n_classes: int,
         lambda shaps: shaps_to_probs(shaps, expected_logits), output_shape=(n_classes,), name="score")(l_shaps)
 
     model = keras.models.Model(inputs=l_input, outputs=[l_score, l_shaps])
-    model.summary()
+
+    if print_summary:
+        model.summary()
 
     if class_weights is None:
         shap_loss = "mean_squared_error"

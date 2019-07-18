@@ -61,7 +61,7 @@ def load_costa_rica_dataset(plot_class_hist: bool = False
 def prepare_data(X: pd.DataFrame,
                  y: pd.Series
                  ) -> Tuple[int, int, int,
-                            pd.DataFrame, pd.Series, pd.DataFrame, pd.Series,
+                            pd.DataFrame, pd.DataFrame, pd.Series, pd.Series,
                             np.ndarray, np.ndarray,
                             np.ndarray]:
     """
