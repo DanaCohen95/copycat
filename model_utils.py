@@ -88,7 +88,7 @@ def test_shaps_to_probs_with_data() -> None:
     X, y = load_costa_rica_dataset()
     (n_samples, n_features, n_classes,
      X_train, X_valid, y_train, y_valid,
-     y_train_onehot, y_valid_onehot,
+     y_train_onehot, y_valid_onehot, y_onehot,
      class_weights) = prepare_data(X, y)
 
     xgb_model = fit_xgboost_classifier(X_train, y_train)

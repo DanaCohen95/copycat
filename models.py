@@ -7,14 +7,16 @@ import pandas as pd
 
 
 def get_vanilla_nn_classifier(n_classes: int,
-                              n_features: int
+                              n_features: int,
+                              print_summary: bool = True,
                               ) -> keras.Sequential:
     """ Create a simple neural network for multiclass classification """
     model = keras.models.Sequential()
     model.add(keras.layers.Dense(units=128, activation="relu", input_dim=n_features))
     model.add(keras.layers.Dense(units=n_classes, activation="softmax"))
     model.compile("adam", "categorical_crossentropy", metrics=["accuracy"])
-    model.summary()
+    if print_summary:
+        model.summary()
     return model
 
 
@@ -103,7 +105,7 @@ def example_evaluate_random_classifier() -> None:
     X, y = load_costa_rica_dataset()
     (n_samples, n_features, n_classes,
      X_train, X_valid, y_train, y_valid,
-     y_train_onehot, y_valid_onehot,
+     y_train_onehot, y_valid_onehot, y_onehot,
      class_weights) = prepare_data(X, y)
 
     xgb_model = fit_xgboost_classifier(X_train, y_train)

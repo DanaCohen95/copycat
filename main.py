@@ -11,7 +11,7 @@ assert model_type in ["student", "vanilla"]
 X, y = load_costa_rica_dataset()
 (n_samples, n_features, n_classes,
  X_train, X_valid, y_train, y_valid,
- y_train_onehot, y_valid_onehot,
+ y_train_onehot, y_valid_onehot, y_onehot,
  class_weights) = prepare_data(X, y)
 
 if not use_weighted_shap_loss:

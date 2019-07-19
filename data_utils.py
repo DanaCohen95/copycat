@@ -62,7 +62,7 @@ def prepare_data(X: pd.DataFrame,
                  y: pd.Series
                  ) -> Tuple[int, int, int,
                             pd.DataFrame, pd.DataFrame, pd.Series, pd.Series,
-                            np.ndarray, np.ndarray,
+                            np.ndarray, np.ndarray, np.ndarray,
                             np.ndarray]:
     """
     Split data to train set and validation set.
@@ -85,8 +85,9 @@ def prepare_data(X: pd.DataFrame,
 
     X_train, X_valid, y_train, y_valid = train_test_split(X, y, test_size=0.2, random_state=7)
 
-    y_train_onehot = to_categorical(y_train)
-    y_valid_onehot = to_categorical(y_valid)
+    y_train_onehot = to_categorical(y_train, num_classes=n_classes)
+    y_valid_onehot = to_categorical(y_valid, num_classes=n_classes)
+    y_onehot = to_categorical(y)
 
     class_counts = y_train.value_counts().sort_index().values
     class_weights = 1. / class_counts
@@ -96,7 +97,7 @@ def prepare_data(X: pd.DataFrame,
 
     return (n_samples, n_features, n_classes,
             X_train, X_valid, y_train, y_valid,
-            y_train_onehot, y_valid_onehot,
+            y_train_onehot, y_valid_onehot, y_onehot,
             class_weights)
 
 
