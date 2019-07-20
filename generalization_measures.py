@@ -7,9 +7,13 @@ import pandas as pd
 from multiprocessing import Pool
 from typing import Union, Tuple, Dict, Callable, Any
 import os
+import os.path as osp
 from xgboost import XGBClassifier
 from xgboost_utils import calculate_shap_values
 import warnings
+import json
+import matplotlib.pyplot as plt
+import time
 
 
 def calculate_scores(y: Union[np.ndarray, pd.Series],
@@ -60,8 +64,14 @@ def train_and_evaluate_student_nn(X: np.ndarray,
 
     # evaluate model
     probs_test, shaps_test = model.predict(X_test)
-    scores = calculate_scores(y_cls_test, probs_test)
+    scores_test = calculate_scores(y_cls_test, probs_test)
 
+    probs_train, shaps_train = model.predict(X_train)
+    scores_train = calculate_scores(y_cls_train, probs_train)
+    scores_train = {"train_" + k: v for k, v in scores_train.items()}
+
+    scores = scores_test
+    scores.update(scores_train)
     return scores
 
 
@@ -85,8 +95,14 @@ def train_and_evaluate_xgboost(X: np.ndarray,
 
     # evaluate model
     probs_test = xgb_model.predict_proba(X_test)
-    scores = calculate_scores(y_test, probs_test)
+    scores_test = calculate_scores(y_test, probs_test)
 
+    probs_train = xgb_model.predict_proba(X_train)
+    scores_train = calculate_scores(y_train, probs_train)
+    scores_train = {"train_" + k: v for k, v in scores_train.items()}
+
+    scores = scores_test
+    scores.update(scores_train)
     return scores
 
 
@@ -111,6 +127,16 @@ def train_and_evaluate_vanilla_nn(X: np.ndarray,
     probs_test = model.predict(X_test)
     scores = calculate_scores(y_test, probs_test)
 
+    # evaluate model
+    probs_test = model.predict(X_test)
+    scores_test = calculate_scores(y_test, probs_test)
+
+    probs_train = model.predict(X_train)
+    scores_train = calculate_scores(y_train, probs_train)
+    scores_train = {"train_" + k: v for k, v in scores_train.items()}
+
+    scores = scores_test
+    scores.update(scores_train)
     return scores
 
 
@@ -151,63 +177,68 @@ def cross_validation(X: np.ndarray,
 
 def example_cross_validation() -> None:
     from data_utils import load_costa_rica_dataset
+    now_str = time.strftime("%Y-%m-%d-%H-%M-%S")
 
     X, y = load_costa_rica_dataset()
     n_samples, n_features = X.shape
     n_classes = len(y.unique())
 
-    model_type = "student_nn"  # student_nn, xgboost, vanilla_nn
+    n_splits = 100
+    for model_type in ["xgboost", "student_nn", "vanilla_nn"]:
 
-    if model_type == "vanilla_nn":
-        fn_kwargs = {
-            "n_classes": n_classes,
-            "n_features": n_features,
-            "epochs": 5
-        }
-        scores_df = cross_validation(X=X.values,
-                                     y=y.values,
-                                     train_and_evaluate_fn=train_and_evaluate_vanilla_nn,
-                                     fn_kwargs=fn_kwargs,
-                                     n_splits=2,
-                                     multiprocess=True)
-        print(scores_df)
-        break_here = "lol"
+        if model_type == "vanilla_nn":
+            fn_kwargs = {
+                "n_classes": n_classes,
+                "n_features": n_features,
+                "epochs": 10
+            }
+            train_and_evaluate_fn = train_and_evaluate_vanilla_nn
 
-    elif model_type == "xgboost":
-        fn_kwargs = {
-            "max_depth": 5,
-            "n_estimators": 30,
-            "learning_rate": 0.1
-        }
-        scores_df = cross_validation(X=X.values,
-                                     y=y.values,
-                                     train_and_evaluate_fn=train_and_evaluate_xgboost,
-                                     fn_kwargs=fn_kwargs,
-                                     n_splits=50,
-                                     multiprocess=True)
-        print(scores_df)
-        break_here = "lol"
+        elif model_type == "xgboost":
+            fn_kwargs = {
+                "max_depth": 10,
+                "n_estimators": 30,
+                "learning_rate": 0.1
+            }
+            train_and_evaluate_fn = train_and_evaluate_xgboost
 
-    elif model_type == "student_nn":
-        fn_kwargs = {
-            "n_classes": n_classes,
-            "n_features": n_features,
-            "epochs": 5,
-            "xgb_max_depth": 5,
-            "xgb_n_estimators": 30,
-            "xgb_learning_rate": 0.1
-        }
+        elif model_type == "student_nn":
+            fn_kwargs = {
+                "n_classes": n_classes,
+                "n_features": n_features,
+                "epochs": 10,
+                "xgb_max_depth": 10,
+                "xgb_n_estimators": 30,
+                "xgb_learning_rate": 0.1
+            }
+            train_and_evaluate_fn = train_and_evaluate_student_nn
+
+        else:
+            raise ValueError("Unsupported model type: " + model_type)
 
         scores_df = cross_validation(X=X.values,
                                      y=y.values,
-                                     train_and_evaluate_fn=train_and_evaluate_student_nn,
+                                     train_and_evaluate_fn=train_and_evaluate_fn,
                                      fn_kwargs=fn_kwargs,
-                                     n_splits=2,
+                                     n_splits=n_splits,
                                      multiprocess=True)
 
         print(scores_df)
-        break_here = "lol"
-    break_here = "lol"
+
+        results_dir = "results/" + now_str + "_" + model_type
+        os.makedirs(results_dir, exist_ok=True)
+
+        scores_path = osp.join(results_dir, "scores.csv")
+        scores_df.to_csv(scores_path)
+
+        fn_kwargs_path = osp.join(results_dir, "fn_kwargs.json")
+        with open(fn_kwargs_path, 'w') as f:
+            json.dump(fn_kwargs, f, indent=2)
+
+        hist_path = osp.join(results_dir, "scores_hist.png")
+        plt.figure()
+        scores_df.hist()
+        plt.savefig(hist_path)
 
 
 if __name__ == '__main__':
