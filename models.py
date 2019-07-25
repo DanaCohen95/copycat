@@ -45,7 +45,9 @@ def get_student_nn_classifier(n_classes: int,
 
     l_input = keras.layers.Input(shape=(n_features,), name="input")
     l_hidden = keras.layers.Dense(units=128, activation="relu", name="hidden")(l_input)
-    l_shaps_flat = keras.layers.Dense(units=n_classes * n_features, name="shaps_flat")(l_hidden)
+    l_hidden1 = keras.layers.Dense(units=128, activation="relu", name="hidden1")(l_hidden)
+    l_hidden2 = keras.layers.Dense(units=128, activation="relu", name="hidden2")(l_hidden1)
+    l_shaps_flat = keras.layers.Dense(units=n_classes * n_features, name="shaps_flat")(l_hidden2)
     l_shaps = keras.layers.Reshape((n_classes, n_features), name="shaps")(l_shaps_flat)
     l_score = keras.layers.Lambda(
         lambda shaps: shaps_to_probs(shaps, expected_logits), output_shape=(n_classes,), name="score")(l_shaps)

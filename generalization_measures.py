@@ -158,7 +158,7 @@ def cross_validation(X: np.ndarray,
                      multiprocess: bool = True
                      ) -> pd.DataFrame:
     if multiprocess:
-        pool = Pool()
+        pool = Pool(3)
         map_func = pool.map
     else:
         map_func = map
@@ -184,20 +184,21 @@ def example_cross_validation() -> None:
     n_classes = len(y.unique())
 
     n_splits = 100
-    for model_type in ["xgboost", "student_nn", "vanilla_nn"]:
+    # for model_type in ["xgboost", "student_nn", "vanilla_nn"]:
+    for model_type in ["xgboost", "vanilla_nn"]:
 
         if model_type == "vanilla_nn":
             fn_kwargs = {
                 "n_classes": n_classes,
                 "n_features": n_features,
-                "epochs": 10
+                "epochs": 50
             }
             train_and_evaluate_fn = train_and_evaluate_vanilla_nn
 
         elif model_type == "xgboost":
             fn_kwargs = {
                 "max_depth": 10,
-                "n_estimators": 30,
+                "n_estimators": 100,
                 "learning_rate": 0.1
             }
             train_and_evaluate_fn = train_and_evaluate_xgboost
@@ -235,11 +236,10 @@ def example_cross_validation() -> None:
         with open(fn_kwargs_path, 'w') as f:
             json.dump(fn_kwargs, f, indent=2)
 
-        hist_path = osp.join(results_dir, "scores_hist.png")
-        plt.figure()
-        scores_df.hist()
-        plt.savefig(hist_path)
-
+        # hist_path = osp.join(results_dir, "scores_hist.png")
+        # plt.figure()
+        # scores_df.hist()
+        # plt.savefig(hist_path)
 
 if __name__ == '__main__':
     example_cross_validation()

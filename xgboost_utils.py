@@ -1,5 +1,6 @@
 import warnings
 from xgboost import XGBClassifier
+import pickle
 import shap
 from sklearn.metrics import classification_report
 import numpy as np
@@ -7,12 +8,21 @@ import pandas as pd
 from typing import Tuple
 
 
+def save_xgboost_classifier(xgb_model, name):
+    pickle._dump(xgb_model, open(name, 'wb'))
+
+
+def load_xgboost_classifier(name):
+    xgb_model = pickle.load(open(name, 'rb'))
+    return xgb_model
+
+
 def fit_xgboost_classifier(X: pd.DataFrame,
                            y: pd.Series
                            ) -> XGBClassifier:
     """ create & fit an XGBoost tree-booster classifier for multiclass data """
     warnings.filterwarnings("ignore", category=DeprecationWarning)
-    xgb_model = XGBClassifier(max_depth=5, n_estimators=30, learning_rate=0.1, objective="multi:softmax")
+    xgb_model = XGBClassifier(max_depth=10, n_estimators=100, learning_rate=0.1, objective="multi:softmax")
     xgb_model.fit(X, y)
     return xgb_model
 
@@ -48,5 +58,12 @@ def calculate_shap_values(xgb_model: XGBClassifier,
     expected_logits = np.array(explainer.expected_value)[np.newaxis, :]
 
     shap_values = explainer.shap_values(X)
+    temp = np.array(shap_values)
+    temp = np.reshape(shap_values, (temp.shape[0] * temp.shape[1],
+                                    temp.shape[2]))
+    sum_features = np.sum(temp, axis=0)
+    ten_max_features = sum_features.argsort()[-10:][::-1]
+    shap_values = shap_values[ten_max_features]
+
     shap_values = np.stack(shap_values, axis=1)
     return shap_values, expected_logits

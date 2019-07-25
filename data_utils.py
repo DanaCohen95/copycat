@@ -30,9 +30,9 @@ def load_costa_rica_dataset(plot_class_hist: bool = False
                   "SQBmeaned", "SQBovercrowding", "age", "agesq", "elimbasu5", "escolari", "hhsize",
                   "hogar_mayor", "hogar_nin", "hogar_total", "qmobilephone",
                   "r4h1", "r4h2", "r4h3", "r4m1", "r4m2", "r4m3", "r4t1",
-                  "rez_esc", "rez_esc", "tamhog", "tamviv", "v18q1", "v2a1"], axis=1)
+                  "rez_esc", "rez_esc", "tamhog", "tamviv", "v18q1", "v2a1", "meaneduc"], axis=1)
     # arbitrarily keep only the first 10 features lol
-    X = df.drop(['Target'], axis=1).iloc[:, :10]
+    X = df.drop(['Target'], axis=1).iloc[:, :]
     y = df['Target'] - 1
 
     # class 3 is VERY common, remove most of its samples.
@@ -44,7 +44,7 @@ def load_costa_rica_dataset(plot_class_hist: bool = False
     count_second_most_common = y.value_counts().sort_values().iloc[-2]
 
     idx_common = y.index.values[(y.values == label_most_common).nonzero()]
-    np.random.shuffle(idx_common)
+    np.random.RandomState(seed=42).shuffle(idx_common)
     idx_drop = idx_common[count_second_most_common:]
 
     X.drop(idx_drop, axis="rows", inplace=True)
