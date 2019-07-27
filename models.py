@@ -22,6 +22,7 @@ def get_vanilla_nn_classifier(n_classes: int,
 
 def get_student_nn_classifier(n_classes: int,
                               n_features: int,
+                              num_features_to_use: int,
                               expected_logits: np.ndarray,
                               use_shap_loss: bool = True,
                               use_score_loss: bool = True,
@@ -47,8 +48,8 @@ def get_student_nn_classifier(n_classes: int,
     l_hidden = keras.layers.Dense(units=128, activation="relu", name="hidden")(l_input)
     l_hidden1 = keras.layers.Dense(units=128, activation="relu", name="hidden1")(l_hidden)
     l_hidden2 = keras.layers.Dense(units=128, activation="relu", name="hidden2")(l_hidden1)
-    l_shaps_flat = keras.layers.Dense(units=n_classes * n_features, name="shaps_flat")(l_hidden2)
-    l_shaps = keras.layers.Reshape((n_classes, n_features), name="shaps")(l_shaps_flat)
+    l_shaps_flat = keras.layers.Dense(units=n_classes * num_features_to_use, name="shaps_flat")(l_hidden2)
+    l_shaps = keras.layers.Reshape((n_classes, num_features_to_use), name="shaps")(l_shaps_flat)
     l_score = keras.layers.Lambda(
         lambda shaps: shaps_to_probs(shaps, expected_logits), output_shape=(n_classes,), name="score")(l_shaps)
 
