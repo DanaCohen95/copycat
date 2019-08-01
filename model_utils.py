@@ -3,7 +3,21 @@ import numpy as np
 MAX_LOGITS = 70
 MIN_LOGITS = -1
 
-def weighted_MSE_loss(y_true, y_pred, weights):
+def weighted_MSE_loss(y_true: tf.Tensor,
+                      y_pred: tf.Tensor,
+                      weights: tf.Tensor
+                      ) -> tf.Tensor:
+    """
+    Mean-Squared-Error Loss for 3-dim tensors, with weights on axis 1.
+
+    Args:
+        y_true: [Batch X d1 X d2]
+        y_pred: [Batch X d1 X d2]
+        weights: [1 X d1 X 1]
+
+    Returns:
+        weighted_MSE: loss per sample [Batch X 1]
+    """
     squared_error = (y_true - y_pred) ** 2
     weighted_squared_error = weights * squared_error
     weighted_MSE = tf.reduce_mean(weighted_squared_error, axis=[1, 2])
@@ -14,11 +28,18 @@ def weighted_MSE_loss(y_true, y_pred, weights):
 def zero_loss(y_true, y_pred):
     return tf.zeros(tf.shape(y_true)[0])
 
-def shaps_to_probs(shaps, expected_logits):
+def shaps_to_probs(shaps: tf.Tensor,
+                   expected_logits: tf.Tensor
+                   ) -> tf.Tensor:
     """
-    shaps: shap values [Batch X Classes X Features]
-    expected_logits: the (reshaped) result of explainer.expected_value [1 X Classes]
-    returns probs: softmaxed probabilities [Batch X Classes]
+    Transform shap values to class probabilities.
+
+    Args:
+        shaps: shap values [Batch X Classes X Features]
+        expected_logits: the (reshaped) result of explainer.expected_value [1 X Classes]
+
+    Returns:
+        probs: softmaxed probabilities [Batch X Classes]
     """
     logit_offsets = tf.reduce_sum(shaps, axis=2)
     logits = logit_offsets + expected_logits
@@ -30,7 +51,8 @@ def shaps_to_probs(shaps, expected_logits):
     return probs
 
 
-def test_weighted_MSE_loss():
+def test_weighted_MSE_loss_technical() -> None:
+    """ technical test for the weighted_MSE_loss tensorflow function """
     sess = tf.Session()
     t_y_true = tf.placeholder(tf.float32)
     t_y_pred = tf.placeholder(tf.float32)
@@ -43,14 +65,8 @@ def test_weighted_MSE_loss():
     print(np_res)
 
 
-def test_shaps_to_probs(xgb_probs=None, shap_values=None, expected_logits=None):
-    """
-
-    :param xgb_probs:   xgb_probs = xgb.predict_proba(X)
-    :param shap_values:
-    :param expected_logits:
-    :return:
-    """
+def test_shaps_to_probs_technical() -> None:
+    """ technical test for the shaps_to_probs tensorflow function """
     sess = tf.Session()
 
     np_shaps = np.random.randn(2, 4, 6)
@@ -62,12 +78,41 @@ def test_shaps_to_probs(xgb_probs=None, shap_values=None, expected_logits=None):
 
     np_res = sess.run(t_res, feed_dict={t_shaps: np_shaps, t_expected_logits: np_expected_logits})
     print(np_res)
+    print()
 
-    if xgb_probs is not None and shap_values is not None and expected_logits is not None:
-        shap_probs = sess.run(t_res, feed_dict={t_shaps: shap_values, t_expected_logits: expected_logits})
-        print(np.allclose(shap_probs, xgb_probs))
+
+def test_shaps_to_probs_with_data() -> None:
+    """
+    test whether the shaps_to_probs tensorflow function actually calculates the correct
+    class probabilities given actual shap values
+    """
+    from data_utils import load_costa_rica_dataset, prepare_data
+    from xgboost_utils import fit_xgboost_classifier, calculate_shap_values
+
+    # load data, train xgboost model, calculate shap values
+    X, y = load_costa_rica_dataset()
+    (n_samples, n_features, n_classes,
+     X_train, X_valid, y_train, y_valid,
+     y_train_onehot, y_valid_onehot, y_onehot,
+     class_weights) = prepare_data(X, y)
+
+    xgb_model = fit_xgboost_classifier(X_train, y_train)
+    shap_values, expected_logits = calculate_shap_values(xgb_model, X)
+    xgb_probs = xgb_model.predict_proba(X)
+
+    # test shaps_to_probs
+    sess = tf.Session()
+
+    t_shaps = tf.placeholder(tf.float32)
+    t_expected_logits = tf.placeholder(tf.float32)
+    t_res = shaps_to_probs(t_shaps, t_expected_logits)
+
+    shap_probs = sess.run(t_res, feed_dict={t_shaps: shap_values, t_expected_logits: expected_logits})
+    print(np.allclose(shap_probs, xgb_probs))
+    print()
 
 
 if __name__ == '__main__':
-    test_shaps_to_probs()
-    test_weighted_MSE_loss()
+    test_weighted_MSE_loss_technical()
+    test_shaps_to_probs_technical()
+    test_shaps_to_probs_with_data()
