@@ -87,13 +87,14 @@ def prepare_data(X: pd.DataFrame,
     n_classes = len(y.unique())
 
     if num_samples_to_keep is not None:
-        splitter = StratifiedShuffleSplit(n_splits=1, train_size=num_samples_to_keep, random_state=34)
-        split = next(splitter.split(X, y))
-        keep_inds, _ = split
-        X = X.iloc[keep_inds]
-        y = y.iloc[keep_inds]
+        num_samples_to_keep = min(num_samples_to_keep, len(X) - n_classes)
+        num_extra = len(X) - num_samples_to_keep
+        X, _, y, _ = train_test_split(X, y,
+                                      train_size=num_samples_to_keep, test_size=num_extra,
+                                      shuffle=True, stratify=y.values, random_state=34)
 
-    X_train, X_valid, y_train, y_valid = train_test_split(X, y, test_size=0.2, random_state=7)
+    X_train, X_valid, y_train, y_valid = train_test_split(X, y, test_size=0.2, random_state=34,
+                                                          shuffle=True, stratify=y.values)
 
     y_train_onehot = to_categorical(y_train, num_classes=n_classes)
     y_valid_onehot = to_categorical(y_valid, num_classes=n_classes)

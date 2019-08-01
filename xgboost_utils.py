@@ -4,14 +4,17 @@ from multi_xgboost import MultiXGBClassifier
 from multi_SHAP import MultiTreeExplainer
 from sklearn.metrics import classification_report
 import numpy as np
-from multi_xgboost import MultiXGBClassifier
 import pickle
 from typing import Tuple
 import pandas as pd
+import os
+import os.path as osp
 
 
 def save_xgboost_classifier(xgb_model, name):
-    pickle._dump(xgb_model, open(name + '.xgb', 'wb'))
+    dir_path = osp.dirname(name)
+    os.makedirs(dir_path, exist_ok=True)
+    pickle.dump(xgb_model, open(name + '.xgb', 'wb'))
 
 
 def load_xgboost_classifier(name):
