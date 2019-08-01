@@ -25,13 +25,14 @@ class_weights = prepare_data(X, y)
 if not use_weighted_shap_loss:
     class_weights = None
 
+
 # xgb_model = fit_xgboost_classifier(X_train, y_train,max_depth=xgb_max_depth,n_estimators=xgb_n_estimators)
 xgb_model = load_xgboost_classifier(f'experiments/{dataset_name}/xgb_depth_{xgb_max_depth}_estimators_{xgb_n_estimators}')
 # save_xgboost_classifier(xgb_model, f'xgb_depth_{xgb_max_depth}_estimators_{xgb_n_estimators}')
 
 evaluate_xgboost_classifier(xgb_model, X_valid, y_valid)
-shap_values_train, expected_logits = calculate_shap_values(xgb_model, X_train, n_features, file_path='experiments/otto/train_shap_values.npy')
-shap_values_valid, _ = calculate_shap_values(xgb_model, X_valid, n_features, file_path='experiments/otto/valid_shap_values.npy')
+shap_values_train, expected_logits = calculate_shap_values(xgb_model, X_train, num_features_to_use, file_path='experiments/otto/train_shap_values.npy')
+shap_values_valid, _ = calculate_shap_values(xgb_model, X_valid, num_features_to_use, file_path='experiments/otto/valid_shap_values.npy')
 # np.save('experiments/otto/train_shap_values.npy', shap_values_train)
 # np.save('experiments/otto/expected_logits.npy', expected_logits)
 # np.save('experiments/otto/shap_values_valid.npy', shap_values_valid)
