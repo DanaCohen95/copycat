@@ -7,6 +7,7 @@ import numpy as np
 from multi_xgboost import MultiXGBClassifier
 import pickle
 from typing import Tuple
+import pandas as pd
 
 def save_xgboost_classifier(xgb_model, name):
     pickle._dump(xgb_model, open(name+'.xgb', 'wb'))
@@ -22,12 +23,12 @@ def fit_xgboost_classifier(X_train, y_train, max_depth=5,n_estimators=30 ):
     xgb_model = MultiXGBClassifier(max_depth=max_depth, n_estimators=n_estimators, learning_rate=0.1, objective="multi:softmax")
     xgb_model.fit(X_train, y_train)
     print("finish fitting xgboost")
-    xgb_model = XGBClassifier(max_depth=10, n_estimators=100, learning_rate=0.1, objective="multi:softmax")
+    xgb_model = MultiXGBClassifier(max_depth=10, n_estimators=100, learning_rate=0.1, objective="multi:softmax")
     xgb_model.fit(X, y)
     return xgb_model
 
 
-def evaluate_xgboost_classifier(xgb_model: XGBClassifier,
+def evaluate_xgboost_classifier(xgb_model: MultiXGBClassifier,
                                 X: pd.DataFrame,
                                 y: pd.Series
                                 ) -> None:

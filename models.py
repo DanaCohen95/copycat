@@ -6,8 +6,6 @@ from typing import Union
 import pandas as pd
 
 def get_vanilla_nn_classifier(n_classes: int,
-                              from typing import Union
-                              import pandas as pd
                               n_features: int,
                               print_summary: bool = True,
                               ) -> keras.Sequential:
@@ -72,7 +70,7 @@ def get_student_nn_classifier(n_classes: int,
 
     model.compile(optimizer="adam",
                   loss=["categorical_crossentropy", shap_loss], #zero_loss
-                  loss_weights=[float(use_target_loss), float(use_shap_loss)],
+                  loss_weights=[float(use_score_loss), float(use_shap_loss)],
                   metrics={"score": ["accuracy"]})
     return model
 
