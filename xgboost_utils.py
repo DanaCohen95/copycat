@@ -23,8 +23,6 @@ def fit_xgboost_classifier(X_train, y_train, max_depth=5,n_estimators=30 ):
     xgb_model = MultiXGBClassifier(max_depth=max_depth, n_estimators=n_estimators, learning_rate=0.1, objective="multi:softmax")
     xgb_model.fit(X_train, y_train)
     print("finish fitting xgboost")
-    xgb_model = MultiXGBClassifier(max_depth=10, n_estimators=100, learning_rate=0.1, objective="multi:softmax")
-    xgb_model.fit(X, y)
     return xgb_model
 
 

@@ -12,6 +12,7 @@ def get_vanilla_nn_classifier(n_classes: int,
     """ Create a simple neural network for multiclass classification """
     model = keras.models.Sequential()
     model.add(keras.layers.Dense(units=128, activation="relu", input_dim=n_features))
+    model.add(keras.layers.Dense(units=163, activation="relu", input_dim=n_features))
     model.add(keras.layers.Dense(units=n_classes, activation="softmax"))
     model.compile("adam", "categorical_crossentropy", metrics=["accuracy"])
     if print_summary:
@@ -27,7 +28,7 @@ def get_student_nn_classifier(n_classes: int,
                               use_score_loss: bool = True,
                               class_weights: np.ndarray = None,
                               print_summary: bool = True,
-                              add_layers=False
+                              add_layers=True
                               ) -> keras.Model:
     """
     Create a shap-value-mimicking neural network for multiclass classification
@@ -45,14 +46,13 @@ def get_student_nn_classifier(n_classes: int,
     assert use_shap_loss or use_score_loss, "at least one of 'use_shap_loss', 'use_score_loss' must be True"
 
     l_input = keras.layers.Input(shape=(n_features,), name="input")
-    l_hidden = keras.layers.Dense(units=128, activation="relu", name="hidden")(l_input)
+    l_hidden0 = keras.layers.Dense(units=128, activation="relu", name="hidden")(l_input)
     if add_layers:
-        l_hidden1 = keras.layers.Dense(units=128, activation="relu", name="hidden1")(l_hidden)
-        l_hidden2 = keras.layers.Dense(units=128, activation="relu", name="hidden2")(l_hidden1)
-        l_shaps_flat = keras.layers.Dense(units=n_classes * num_shap_features, name="shaps_flat")(l_hidden2)
+        l_hidden1 = keras.layers.Dense(units=128, activation="relu", name="hidden1")(l_hidden0)
+        l_shaps_flat = keras.layers.Dense(units=n_classes * num_shap_features, name="shaps_flat")(l_hidden1)
         l_shaps = keras.layers.Reshape((n_classes, num_shap_features), name="shaps")(l_shaps_flat)
     else:
-        l_shaps_flat = keras.layers.Dense(units=n_classes * num_shap_features, name="shaps_flat")(l_hidden)
+        l_shaps_flat = keras.layers.Dense(units=n_classes * num_shap_features, name="shaps_flat")(l_hidden0)
         l_shaps = keras.layers.Reshape((n_classes, num_shap_features), name="shaps")(l_shaps_flat)
     l_score = keras.layers.Lambda(
         lambda shaps: shaps_to_probs(shaps, expected_logits), output_shape=(n_classes,), name="score")(l_shaps)
