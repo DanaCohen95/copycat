@@ -30,9 +30,9 @@ if load_saved_values:
         'experiments/{dataset_name}/xgb_depth_{xgb_max_depth}_estimators_{xgb_n_estimators}'.format(
             dataset_name=dataset_name, xgb_max_depth=xgb_max_depth, xgb_n_estimators=xgb_n_estimators))
     shap_values_train, expected_logits = calculate_shap_values(xgb_model, X_train, num_features_to_use,
-                                                               file_path='experiments/costa_rica/train_shap_values.npy')
+                                                               file_path='experiments/{dataset_name}/train_shap_values.npy'.format(dataset_name=dataset_name))
     shap_values_valid, _ = calculate_shap_values(xgb_model, X_valid, num_features_to_use,
-                                                 file_path='experiments/costa_rica/valid_shap_values.npy')
+                                                 file_path='experiments/{dataset_name}/valid_shap_values.npy'.format(dataset_name=dataset_name))
 else:
     xgb_model = fit_xgboost_classifier(X_train, y_train, max_depth=xgb_max_depth, n_estimators=xgb_n_estimators)
     save_xgboost_classifier(xgb_model,
