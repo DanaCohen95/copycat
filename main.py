@@ -41,9 +41,9 @@ else:
 
     shap_values_train, expected_logits = calculate_shap_values(xgb_model, X_train, num_features_to_use)
     shap_values_valid, _ = calculate_shap_values(xgb_model, X_valid, num_features_to_use)
-    np.save('experiments/{dataset_name}/train_shap_values.npy', shap_values_train)
-    np.save('experiments/{dataset_name}/expected_logits.npy', expected_logits)
-    np.save('experiments/{dataset_name}/shap_values_valid.npy', shap_values_valid)
+    np.save('experiments/{dataset_name}/train_shap_values.npy'.format(dataset_name=dataset_name), shap_values_train)
+    np.save('experiments/{dataset_name}/expected_logits.npy'.format(dataset_name=dataset_name), expected_logits)
+    np.save('experiments/{dataset_name}/shap_values_valid.npy'.format(dataset_name=dataset_name), shap_values_valid)
 
 if model_type == "student":
     model = get_student_nn_classifier(n_classes, n_features, num_features_to_use,
