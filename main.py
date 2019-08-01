@@ -1,41 +1,49 @@
 from models import get_student_nn_classifier, get_vanilla_nn_classifier
 from data_utils import load_costa_rica_dataset, prepare_data
 from models import get_student_nn_classifier
-from data_utils import prepare_data,load_dataset
+from data_utils import prepare_data, load_dataset
 from xgboost_utils import fit_xgboost_classifier, calculate_shap_values, \
-    evaluate_xgboost_classifier,save_xgboost_classifier, load_xgboost_classifier
+    evaluate_xgboost_classifier, save_xgboost_classifier, load_xgboost_classifier
 import numpy as np
 from sklearn.metrics import classification_report
 
+load_saved_values = True
 use_weighted_shap_loss = False
-xgb_max_depth,xgb_n_estimators = 10,30
-NUM_EPOCHS = 10
-num_features_to_use = 93
+xgb_max_depth, xgb_n_estimators = 10, 100
+NUM_EPOCHS = 50
+num_features_to_use = 10
 model_type = "student"
 assert model_type in ["student", "vanilla"]
-dataset_name = 'otto'# 'costa_rica' 'safe_drive'
+dataset_name = 'costa_rica'
 
 X, y = load_dataset(dataset_name)
-n_samples, n_features, n_classes,\
-X_train, X_valid, y_train,y_valid, \
-y_train_onehot, y_valid_onehot, y_onehot,\
+n_samples, n_features, n_classes, \
+X_train, X_valid, y_train, y_valid, \
+y_train_onehot, y_valid_onehot, y_onehot, \
 class_weights = prepare_data(X, y)
-
 
 if not use_weighted_shap_loss:
     class_weights = None
 
+if load_saved_values:
+    xgb_model = load_xgboost_classifier(
+        'experiments/{dataset_name}/xgb_depth_{xgb_max_depth}_estimators_{xgb_n_estimators}'.format(
+            dataset_name=dataset_name, xgb_max_depth=xgb_max_depth, xgb_n_estimators=xgb_n_estimators))
+    shap_values_train, expected_logits = calculate_shap_values(xgb_model, X_train, num_features_to_use,
+                                                               file_path='experiments/costa_rica/train_shap_values.npy')
+    shap_values_valid, _ = calculate_shap_values(xgb_model, X_valid, num_features_to_use,
+                                                 file_path='experiments/costa_rica/valid_shap_values.npy')
+else:
+    xgb_model = fit_xgboost_classifier(X_train, y_train, max_depth=xgb_max_depth, n_estimators=xgb_n_estimators)
+    save_xgboost_classifier(xgb_model,
+        'experiments/{dataset_name}/xgb_depth_{xgb_max_depth}_estimators_{xgb_n_estimators}'.format(
+            dataset_name=dataset_name, xgb_max_depth=xgb_max_depth, xgb_n_estimators=xgb_n_estimators))
 
-xgb_model = fit_xgboost_classifier(X_train, y_train,max_depth=xgb_max_depth,n_estimators=xgb_n_estimators)
-save_xgboost_classifier(xgb_model, f'experiments/{dataset_name}/xgb_depth_{xgb_max_depth}_estimators_{xgb_n_estimators}')
-# xgb_model = load_xgboost_classifier(f'experiments/{dataset_name}/xgb_depth_{xgb_max_depth}_estimators_{xgb_n_estimators}')
-
-evaluate_xgboost_classifier(xgb_model, X_valid, y_valid)
-shap_values_train, expected_logits = calculate_shap_values(xgb_model, X_train, num_features_to_use)#file_path='experiments/otto/train_shap_values.npy'
-shap_values_valid, _ = calculate_shap_values(xgb_model, X_valid, num_features_to_use)#file_path='experiments/otto/valid_shap_values.npy'
-np.save('experiments/{dataset_name}/train_shap_values.npy', shap_values_train)
-np.save('experiments/{dataset_name}/expected_logits.npy', expected_logits)
-np.save('experiments/{dataset_name}/shap_values_valid.npy', shap_values_valid)
+    shap_values_train, expected_logits = calculate_shap_values(xgb_model, X_train, num_features_to_use)
+    shap_values_valid, _ = calculate_shap_values(xgb_model, X_valid, num_features_to_use)
+    np.save('experiments/{dataset_name}/train_shap_values.npy', shap_values_train)
+    np.save('experiments/{dataset_name}/expected_logits.npy', expected_logits)
+    np.save('experiments/{dataset_name}/shap_values_valid.npy', shap_values_valid)
 
 if model_type == "student":
     model = get_student_nn_classifier(n_classes, n_features, num_features_to_use,
@@ -47,7 +55,10 @@ if model_type == "student":
 
     scores, shaps = model.predict(X_valid.values)
     preds = np.argmax(scores, axis=1)
+    print("student nn classification report:")
     print(classification_report(y_valid.values, preds))
+    print("xgboost classification report:")
+    evaluate_xgboost_classifier(xgb_model, X_valid, y_valid)
 
 elif model_type == "vanilla":
     model = get_vanilla_nn_classifier(n_classes, n_features)
@@ -57,8 +68,7 @@ elif model_type == "vanilla":
 
     scores = model.predict(X_valid.values)
     preds = np.argmax(scores, axis=1)
+    print("vanilla nn classification report:")
     print(classification_report(y_valid.values, preds))
-    print("=====")
-    print("=====")
-    print("=====")
+    print("xgboost classification report:")
     evaluate_xgboost_classifier(xgb_model, X_valid, y_valid)

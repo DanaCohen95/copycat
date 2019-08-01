@@ -118,7 +118,7 @@ def load_otto_dataset():
     return X,y
 
 def load_dataset(dataset_name):
-    print (f"loading {dataset_name} dataset")
+    print("loading {dataset_name} dataset".format(dataset_name=dataset_name))
     if dataset_name is 'costa_rica':
         return load_costa_rica_dataset()
     if dataset_name is 'safe_drive':
