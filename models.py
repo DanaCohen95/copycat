@@ -1,7 +1,7 @@
 from tensorflow import keras
 import numpy as np
 from sklearn.metrics import classification_report
-from model_utils import shaps_to_probs, weighted_MSE_loss
+from model_utils import shaps_to_probs, weighted_MSE_loss, zero_loss
 
 
 def get_vanilla_nn_classifier(n_classes, n_features):
@@ -35,7 +35,7 @@ def get_student_nn_classifier(n_classes, n_features, expected_logits,
             return weighted_MSE_loss(y_true, y_pred, weights=class_weights)
 
     model.compile(optimizer="adam",
-                  loss=["categorical_crossentropy", shap_loss],
+                  loss=["categorical_crossentropy", shap_loss], #zero_loss
                   loss_weights=[float(use_target_loss), float(use_shap_loss)],
                   metrics={"score": ["accuracy"]})
     return model

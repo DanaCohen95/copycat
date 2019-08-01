@@ -29,11 +29,14 @@ def evaluate_xgboost_classifier(xgb_model, X_valid, y_valid):
     print(classification_report(y_valid.values, preds))
 
 
-def calculate_shap_values(xgb_model, X):
+def calculate_shap_values(xgb_model, X, file_path=None):
     explainer = MultiTreeExplainer(xgb_model)
     explainer.shap_values(np.ones((1, X.shape[1])))
     expected_logits = np.array(explainer.expected_value)[np.newaxis, :]
 
-    shap_values = explainer.shap_values(X)
-    shap_values = np.stack(shap_values, axis=1)
+    if file_path is not None:
+        shap_values = np.load(file_path)
+    else:
+        shap_values = explainer.shap_values(X)
+        shap_values = np.stack(shap_values, axis=1)
     return shap_values, expected_logits

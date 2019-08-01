@@ -1,6 +1,7 @@
 import tensorflow as tf
 import numpy as np
-
+MAX_LOGITS = 70
+MIN_LOGITS = -1
 
 def weighted_MSE_loss(y_true, y_pred, weights):
     squared_error = (y_true - y_pred) ** 2
@@ -10,6 +11,9 @@ def weighted_MSE_loss(y_true, y_pred, weights):
     return weighted_MSE
 
 
+def zero_loss(y_true, y_pred):
+    return tf.zeros(tf.shape(y_true)[0])
+
 def shaps_to_probs(shaps, expected_logits):
     """
     shaps: shap values [Batch X Classes X Features]
@@ -18,6 +22,8 @@ def shaps_to_probs(shaps, expected_logits):
     """
     logit_offsets = tf.reduce_sum(shaps, axis=2)
     logits = logit_offsets + expected_logits
+    logits = tf.minimum(logits, MAX_LOGITS)
+    logits = tf.maximum(logits, MIN_LOGITS)
     logits = logits - tf.reduce_min(logits, axis=1, keepdims=True)
     probs = tf.exp(logits)
     probs = probs / tf.reduce_sum(probs, axis=1, keepdims=True)
