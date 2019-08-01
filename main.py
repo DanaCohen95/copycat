@@ -1,14 +1,18 @@
 from models import get_student_nn_classifier, get_vanilla_nn_classifier
+from data_utils import load_costa_rica_dataset, prepare_data
+from models import get_student_nn_classifier
+from data_utils import prepare_data, load_dataset
 from data_utils import prepare_data, load_dataset
 from xgboost_utils import fit_xgboost_classifier, calculate_shap_values, \
     evaluate_xgboost_classifier, save_xgboost_classifier, load_xgboost_classifier
 import numpy as np
 from sklearn.metrics import classification_report, log_loss
 
+load_saved_values = True
 use_weighted_shap_loss = False
-xgb_max_depth, xgb_n_estimators = 10, 30
-NUM_EPOCHS = 1
-num_shap_features = 93
+xgb_max_depth, xgb_n_estimators = 10, 100
+NUM_EPOCHS = 50
+num_shap_features = 10
 model_type = "student"
 assert model_type in ["student", "vanilla"]
 dataset_name = 'otto'  # 'otto' 'costa_rica' 'safe_drive'
@@ -24,22 +28,25 @@ if not use_weighted_shap_loss:
     class_weights = None
 
 if model_type == "student":
-    xgb_model = fit_xgboost_classifier(X_train, y_train, max_depth=xgb_max_depth, n_estimators=xgb_n_estimators)
-    # xgb_model = load_xgboost_classifier(
-    #     'experiments/{dataset_name}/xgb_depth_{xgb_max_depth}_estimators_{xgb_n_estimators}'.format(
-    #         dataset_name=dataset_name, xgb_max_depth=xgb_max_depth, xgb_n_estimators=xgb_n_estimators))
-    # save_xgboost_classifier(xgb_model, f'xgb_depth_{xgb_max_depth}_estimators_{xgb_n_estimators}')
-
-    # evaluate_xgboost_classifier(xgb_model, X_valid, y_valid)
-    shap_values_train, expected_logits = calculate_shap_values(xgb_model, X_train, num_shap_features,
-                                                               file_path=None)
-    # file_path='experiments/otto/train_shap_values.npy')
-    shap_values_valid, _ = calculate_shap_values(xgb_model, X_valid, num_shap_features,
-                                                 file_path=None)
-    # file_path='experiments/otto/valid_shap_values.npy')
-    # np.save('experiments/otto/train_shap_values.npy', shap_values_train)
-    # np.save('experiments/otto/expected_logits.npy', expected_logits)
-    # np.save('experiments/otto/shap_values_valid.npy', shap_values_valid)
+    if load_saved_values:
+        xgb_model = load_xgboost_classifier(
+            'experiments/{dataset_name}/xgb_depth_{xgb_max_depth}_estimators_{xgb_n_estimators}'.format(
+                dataset_name=dataset_name, xgb_max_depth=xgb_max_depth, xgb_n_estimators=xgb_n_estimators))
+        shap_values_train, expected_logits = calculate_shap_values(xgb_model, X_train, num_shap_features,
+                                                                   file_path='experiments/costa_rica/train_shap_values.npy')
+        shap_values_valid, _ = calculate_shap_values(xgb_model, X_valid, num_shap_features,
+                                                     file_path='experiments/costa_rica/valid_shap_values.npy')
+    else:
+        xgb_model = fit_xgboost_classifier(X_train, y_train, max_depth=xgb_max_depth, n_estimators=xgb_n_estimators)
+        save_xgboost_classifier(xgb_model,
+            'experiments/{dataset_name}/xgb_depth_{xgb_max_depth}_estimators_{xgb_n_estimators}'.format(
+                dataset_name=dataset_name, xgb_max_depth=xgb_max_depth, xgb_n_estimators=xgb_n_estimators))
+    
+        shap_values_train, expected_logits = calculate_shap_values(xgb_model, X_train, num_shap_features)
+        shap_values_valid, _ = calculate_shap_values(xgb_model, X_valid, num_shap_features)
+        np.save('experiments/{dataset_name}/train_shap_values.npy'.format(dataset_name=dataset_name), shap_values_train)
+        np.save('experiments/{dataset_name}/expected_logits.npy'.format(dataset_name=dataset_name), expected_logits)
+        np.save('experiments/{dataset_name}/shap_values_valid.npy'.format(dataset_name=dataset_name), shap_values_valid)
 
     model = get_student_nn_classifier(n_classes, n_features, num_shap_features,
                                       expected_logits, class_weights=class_weights)
