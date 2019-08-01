@@ -9,22 +9,22 @@ import pickle
 from typing import Tuple
 import pandas as pd
 
+
 def save_xgboost_classifier(xgb_model, name):
-    pickle._dump(xgb_model, open(name+'.xgb', 'wb'))
+    pickle._dump(xgb_model, open(name + '.xgb', 'wb'))
 
 
 def load_xgboost_classifier(name):
-    xgb_model = pickle.load(open(name+'.xgb', 'rb'))
+    xgb_model = pickle.load(open(name + '.xgb', 'rb'))
     return xgb_model
 
 
-def fit_xgboost_classifier(X_train, y_train, max_depth=5,n_estimators=30 ):
+def fit_xgboost_classifier(X_train, y_train, max_depth=5, n_estimators=30):
     warnings.filterwarnings("ignore", category=DeprecationWarning)
-    xgb_model = MultiXGBClassifier(max_depth=max_depth, n_estimators=n_estimators, learning_rate=0.1, objective="multi:softmax")
+    xgb_model = MultiXGBClassifier(max_depth=max_depth, n_estimators=n_estimators, learning_rate=0.1,
+                                   objective="multi:softmax")
     xgb_model.fit(X_train, y_train)
     print("finish fitting xgboost")
-    xgb_model = MultiXGBClassifier(max_depth=10, n_estimators=100, learning_rate=0.1, objective="multi:softmax")
-    xgb_model.fit(X, y)
     return xgb_model
 
 
@@ -37,11 +37,10 @@ def evaluate_xgboost_classifier(xgb_model: MultiXGBClassifier,
     print(classification_report(y.values, preds))
 
 
-
-def calculate_shap_values(xgb_model:MultiTreeExplainer,
+def calculate_shap_values(xgb_model: MultiTreeExplainer,
                           X: pd.DataFrame,
                           num_features: int,
-                          file_path=None)-> Tuple[np.ndarray, np.ndarray]:
+                          file_path=None) -> Tuple[np.ndarray, np.ndarray]:
     """
     Calculate SHAP values for an XGBoost multiclass classifier using a shap TreeExplainer.
 
