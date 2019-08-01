@@ -19,18 +19,18 @@ X, y = load_costa_rica_dataset()
 if not use_weighted_shap_loss:
     class_weights = None
 
-xgb_model = load_xgboost_classifier("xgb_tomersh.xgb")
-# xgb_model = fit_xgboost_classifier(X_train, y_train)
-# save_xgboost_classifier(xgb_model, "xgb_tomersh.xgb")
+# xgb_model = load_xgboost_classifier("xgb_tomersh.xgb")
+xgb_model = fit_xgboost_classifier(X_train, y_train)
+save_xgboost_classifier(xgb_model, "xgb_tomersh.xgb")
 
-# shap_values_train, expected_logits = calculate_shap_values(xgb_model, X_train, num_features_to_use)
-# shap_values_valid, _ = calculate_shap_values(xgb_model, X_valid, num_features_to_use)
-# np.save('shap_values_train.npy', shap_values_train)
-# np.save('expected_logits.npy', expected_logits)
-# np.save('shap_values_valid.npy', shap_values_valid)
-shap_values_train = np.load('shap_values_train.npy')
-expected_logits = np.load('expected_logits.npy')
-shap_values_valid = np.load('shap_values_valid.npy')
+shap_values_train, expected_logits = calculate_shap_values(xgb_model, X_train, num_features_to_use)
+shap_values_valid, _ = calculate_shap_values(xgb_model, X_valid, num_features_to_use)
+np.save('shap_values_train.npy', shap_values_train)
+np.save('expected_logits.npy', expected_logits)
+np.save('shap_values_valid.npy', shap_values_valid)
+# shap_values_train = np.load('shap_values_train.npy')
+# expected_logits = np.load('expected_logits.npy')
+# shap_values_valid = np.load('shap_values_valid.npy')
 
 # evaluate_xgboost_classifier(xgb_model, X_valid, y_valid)
 

@@ -63,11 +63,10 @@ def calculate_shap_values(xgb_model: XGBClassifier,
     expected_logits = np.array(explainer.expected_value)[np.newaxis, :]
 
     shap_values = explainer.shap_values(X)
-    shap_values = np.array(shap_values)
-    sum_features = np.sum(np.reshape(shap_values,
-                                     (-1, shap_values.shape[2])), axis=0)
-    n_max_features = sum_features.argsort()[-1*num_features:][::-1]
+    shap_values = np.stack(shap_values, axis=1)
+
+    sum_features = np.sum(np.abs(shap_values), axis=(0, 1))
+    n_max_features = sum_features.argsort()[-1 * num_features:][::-1]
     shap_values = shap_values[:, :, n_max_features]
 
-    shap_values = np.stack(shap_values, axis=1)
     return shap_values, expected_logits

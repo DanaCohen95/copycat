@@ -31,6 +31,7 @@ def load_costa_rica_dataset(plot_class_hist: bool = False
                   "hogar_mayor", "hogar_nin", "hogar_total", "qmobilephone",
                   "r4h1", "r4h2", "r4h3", "r4m1", "r4m2", "r4m3", "r4t1",
                   "rez_esc", "rez_esc", "tamhog", "tamviv", "v18q1", "v2a1", "meaneduc"], axis=1)
+
     # arbitrarily keep only the first 10 features lol
     X = df.drop(['Target'], axis=1).iloc[:, :]
     y = df['Target'] - 1
