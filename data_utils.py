@@ -104,10 +104,18 @@ def prepare_data(X: pd.DataFrame,
 def load_sefe_drive_dataset():
     df = pd.read_csv("data/safe_driver/train.csv")
     df = df.drop(["ps_ind_05_cat","ps_ind_14","ps_ind_01","ps_car_04_cat","ps_car_09_cat","ps_calc_12"], axis=1)
-
-
     X = df.drop(['target'], axis=1).iloc[:, :]
     y = df['target'].astype(int)
+
+    label_most_common = y.value_counts().idxmax()
+    count_second_most_common = y.value_counts().sort_values().iloc[-2]
+
+    idx_common = y.index.values[(y.values == label_most_common).nonzero()]
+    np.random.RandomState(seed=42).shuffle(idx_common)
+    idx_drop = idx_common[count_second_most_common:]
+
+    X.drop(idx_drop, axis="rows", inplace=True)
+    y.drop(idx_drop, axis="rows", inplace=True)
     return X,y
 
 
