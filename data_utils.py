@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from tensorflow.keras.utils import to_categorical
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, StratifiedShuffleSplit
 from typing import Tuple
 
 
@@ -60,7 +60,8 @@ def load_costa_rica_dataset(plot_class_hist: bool = False
 
 
 def prepare_data(X: pd.DataFrame,
-                 y: pd.Series
+                 y: pd.Series,
+                 num_samples_to_keep: int = None
                  ) -> Tuple[int, int, int,
                             pd.DataFrame, pd.DataFrame, pd.Series, pd.Series,
                             np.ndarray, np.ndarray, np.ndarray,
@@ -72,6 +73,7 @@ def prepare_data(X: pd.DataFrame,
     Args:
         X: feature matrix dataframe [Samples X Features]
         y: class labels series [Samples]
+        num_samples_to_keep: randomly keep only some of the samples
 
     Returns:
         n_samples, n_features, n_classes: as the name implies
@@ -84,7 +86,15 @@ def prepare_data(X: pd.DataFrame,
     n_samples, n_features = X.shape
     n_classes = len(y.unique())
 
-    X_train, X_valid, y_train, y_valid = train_test_split(X, y, test_size=0.2, random_state=7)
+    if num_samples_to_keep is not None:
+        num_samples_to_keep = min(num_samples_to_keep, len(X) - n_classes)
+        num_extra = len(X) - num_samples_to_keep
+        X, _, y, _ = train_test_split(X, y,
+                                      train_size=num_samples_to_keep, test_size=num_extra,
+                                      shuffle=True, stratify=y.values, random_state=34)
+
+    X_train, X_valid, y_train, y_valid = train_test_split(X, y, test_size=0.2, random_state=34,
+                                                          shuffle=True, stratify=y.values)
 
     y_train_onehot = to_categorical(y_train, num_classes=n_classes)
     y_valid_onehot = to_categorical(y_valid, num_classes=n_classes)
@@ -101,27 +111,28 @@ def prepare_data(X: pd.DataFrame,
             y_train_onehot, y_valid_onehot, y_onehot,
             class_weights)
 
-def load_sefe_drive_dataset():
-    df = pd.read_csv("data/safe_driver/train.csv")
-    df = df.drop(["ps_ind_05_cat","ps_ind_14","ps_ind_01","ps_car_04_cat","ps_car_09_cat","ps_calc_12"], axis=1)
 
+def load_safe_drive_dataset():
+    df = pd.read_csv("data/safe_driver/train.csv")
+    df = df.drop(["ps_ind_05_cat", "ps_ind_14", "ps_ind_01", "ps_car_04_cat", "ps_car_09_cat", "ps_calc_12"], axis=1)
 
     X = df.drop(['target'], axis=1).iloc[:, :]
     y = df['target'].astype(int)
-    return X,y
+    return X, y
 
 
 def load_otto_dataset():
     df = pd.read_csv("data/otto_dataset/train.csv")
-    X = df.drop(['target','id'], axis=1).iloc[:, :]
-    y = df['target'].str.split('_', expand=True)[1].astype(int)-1
-    return X,y
+    X = df.drop(['target', 'id'], axis=1).iloc[:, :]
+    y = df['target'].str.split('_', expand=True)[1].astype(int) - 1
+    return X, y
+
 
 def load_dataset(dataset_name):
     print("loading {dataset_name} dataset".format(dataset_name=dataset_name))
     if dataset_name is 'costa_rica':
         return load_costa_rica_dataset()
     if dataset_name is 'safe_drive':
-        return load_sefe_drive_dataset()
+        return load_safe_drive_dataset()
     if dataset_name is 'otto':
         return load_otto_dataset()

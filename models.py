@@ -46,14 +46,13 @@ def get_student_nn_classifier(n_classes: int,
     assert use_shap_loss or use_score_loss, "at least one of 'use_shap_loss', 'use_score_loss' must be True"
 
     l_input = keras.layers.Input(shape=(n_features,), name="input")
-    l_hidden0 = keras.layers.Dense(units=128, activation="relu", name="hidden")(l_input)
+    l_hidden0 = keras.layers.Dense(units=128, activation="relu", name="hidden0")(l_input)
     if add_layers:
         l_hidden1 = keras.layers.Dense(units=128, activation="relu", name="hidden1")(l_hidden0)
         l_shaps_flat = keras.layers.Dense(units=n_classes * num_shap_features, name="shaps_flat")(l_hidden1)
-        l_shaps = keras.layers.Reshape((n_classes, num_shap_features), name="shaps")(l_shaps_flat)
     else:
         l_shaps_flat = keras.layers.Dense(units=n_classes * num_shap_features, name="shaps_flat")(l_hidden0)
-        l_shaps = keras.layers.Reshape((n_classes, num_shap_features), name="shaps")(l_shaps_flat)
+    l_shaps = keras.layers.Reshape((n_classes, num_shap_features), name="shaps")(l_shaps_flat)
     l_score = keras.layers.Lambda(
         lambda shaps: shaps_to_probs(shaps, expected_logits), output_shape=(n_classes,), name="score")(l_shaps)
 
