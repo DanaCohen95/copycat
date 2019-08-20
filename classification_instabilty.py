@@ -1,4 +1,5 @@
 from models import get_student_nn_classifier, get_vanilla_nn_classifier
+import scipy.spatial as sp
 import numpy as np
 from sklearn.model_selection import StratifiedShuffleSplit
 from sklearn.metrics import average_precision_score, accuracy_score, f1_score
@@ -16,21 +17,13 @@ import matplotlib.pyplot as plt
 import time
 
 
-def calculate_scores(y: Union[np.ndarray, pd.Series],
-                     probs: np.ndarray
-                     ) -> Dict[str, np.ndarray]:
-    if np.ndim(y) == 2:
-        y = np.argmax(y, axis=1)
-    n_classes = probs.shape[1]
-    preds = np.argmax(probs, axis=1)
+def calculate_disagreement(probs1: np.ndarray,
+                           probs2: np.ndarray
+                           ) -> int:
+    preds1 = np.argmax(probs1, axis=1)
+    preds2 = np.argmax(probs2, axis=1)
 
-    scores = {
-        "accuracy": accuracy_score(y, preds),
-        "average_precision_macro": average_precision_score(
-            to_categorical(y, num_classes=n_classes), probs, average="macro"),
-        "f1_macro": f1_score(y, preds, average="macro")
-    }
-    return scores
+    return np.sum(np.clip(np.abs(preds1 - preds2), 0, 1)) / preds1.size
 
 
 def train_and_evaluate_student_nn(X: np.ndarray,
@@ -45,33 +38,40 @@ def train_and_evaluate_student_nn(X: np.ndarray,
                                   xgb_learning_rate: float
                                   ) -> Dict[str, np.ndarray]:
     # split data
-    X_train, X_test = X[inds_train], X[inds_test]
-    y_cls_train, y_cls_test = y[inds_train], y[inds_test]
-    y_cls_train_onehot = to_categorical(y_cls_train, num_classes=n_classes)
+    X_trains, X_test = (X[inds_train[:inds_train.size / 2]],
+                        X[inds_train[inds_train.size / 2:]]), X[inds_test]
+    y_cls_trains, y_cls_test = (y[inds_train[:inds_train.size / 2]],
+                                y[inds_train[inds_train.size / 2:]]), y[inds_test]
 
-    # build and train XGBoost model, calculate shap values
-    warnings.filterwarnings("ignore", category=DeprecationWarning)
-    xgb_model = XGBClassifier(max_depth=xgb_max_depth,
-                              n_estimators=xgb_n_estimators,
-                              learning_rate=xgb_learning_rate,
-                              objective="multi:softmax")
-    xgb_model.fit(X_train, y_cls_train)
-    y_shap_train, expected_logits = calculate_shap_values(xgb_model, X_train)
+    probs = []
+    for i in range(2):
+        X_train = X_trains[i]
+        y_cls_train = y_cls_trains[i]
+        y_cls_train_onehot = to_categorical(y_cls_train, num_classes=n_classes)
 
-    # build and train model
-    model = get_student_nn_classifier(n_classes, n_features, expected_logits, print_summary=False)
-    model.fit(X_train, [y_cls_train_onehot, y_shap_train], epochs=epochs, verbose=0)
+        # build and train XGBoost model, calculate shap values
+        warnings.filterwarnings("ignore", category=DeprecationWarning)
+        xgb_model = XGBClassifier(max_depth=xgb_max_depth,
+                                  n_estimators=xgb_n_estimators,
+                                  learning_rate=xgb_learning_rate,
+                                  objective="multi:softmax")
+        xgb_model.fit(X_train, y_cls_train)
+        y_shap_train, expected_logits = calculate_shap_values(xgb_model, X_train)
 
-    # evaluate model
-    probs_test, shaps_test = model.predict(X_test)
-    scores_test = calculate_scores(y_cls_test, probs_test)
+        # build and train model
+        model = get_student_nn_classifier(n_classes, n_features, expected_logits, print_summary=False)
+        model.fit(X_train, [y_cls_train_onehot, y_shap_train], epochs=epochs, verbose=0)
 
-    probs_train, shaps_train = model.predict(X_train)
-    scores_train = calculate_scores(y_cls_train, probs_train)
-    scores_train = {"train_" + k: v for k, v in scores_train.items()}
+        # evaluate model
+        temp, _ = model.predict(X_test)
+        probs.append(temp)
 
-    scores = scores_test
-    scores.update(scores_train)
+    pOfDisagreement = calculate_disagreement(probs[0], probs[1])
+    # JSD = sp.distance.jensenshannon(probs[0], probs[1])
+
+    scores = {
+        "Percentage of disagreement": pOfDisagreement
+    }
     return scores
 
 
@@ -84,25 +84,30 @@ def train_and_evaluate_xgboost(X: np.ndarray,
                                learning_rate: float = 0.1
                                ) -> Dict[str, np.ndarray]:
     # split data
-    X_train, X_test = X[inds_train], X[inds_test]
-    y_train, y_test = y[inds_train], y[inds_test]
+    X_trains, X_test = (X[inds_train[:int(inds_train.size / 2)]],
+                        X[inds_train[int(inds_train.size / 2):]]), X[inds_test]
+    y_trains, y_test = (y[inds_train[:int(inds_train.size / 2)]],
+                                y[inds_train[int(inds_train.size / 2):]]), y[inds_test]
 
-    # build and train model
-    warnings.filterwarnings("ignore", category=DeprecationWarning)
-    xgb_model = XGBClassifier(max_depth=max_depth, n_estimators=n_estimators, learning_rate=learning_rate,
+    probs = []
+    for i in range(2):
+        X_train = X_trains[i]
+        y_train = y_trains[i]
+        # build and train model
+        warnings.filterwarnings("ignore", category=DeprecationWarning)
+        xgb_model = XGBClassifier(max_depth=max_depth, n_estimators=n_estimators, learning_rate=learning_rate,
                               objective="multi:softmax")
-    xgb_model.fit(X_train, y_train)
+        xgb_model.fit(X_train, y_train)
 
-    # evaluate model
-    probs_test = xgb_model.predict_proba(X_test)
-    scores_test = calculate_scores(y_test, probs_test)
+        # evaluate model
+        probs.append(xgb_model.predict_proba(X_test))
 
-    probs_train = xgb_model.predict_proba(X_train)
-    scores_train = calculate_scores(y_train, probs_train)
-    scores_train = {"train_" + k: v for k, v in scores_train.items()}
+    pOfDisagreement = calculate_disagreement(probs[0], probs[1])
+    # JSD = sp.distance.jensenshannon(probs[0], probs[1])
 
-    scores = scores_test
-    scores.update(scores_train)
+    scores = {
+        "Percentage of disagreement": pOfDisagreement
+    }
     return scores
 
 
@@ -114,29 +119,32 @@ def train_and_evaluate_vanilla_nn(X: np.ndarray,
                                   n_features: int,
                                   epochs: int
                                   ) -> Dict[str, np.ndarray]:
+
     # split data
-    X_train, X_test = X[inds_train], X[inds_test]
-    y_train, y_test = y[inds_train], y[inds_test]
-    y_train_onehot = to_categorical(y_train, num_classes=n_classes)
+    X_trains, X_test = (X[inds_train[:int(inds_train.size / 2)]],
+                        X[inds_train[int(inds_train.size / 2):]]), X[inds_test]
+    y_trains, y_test = (y[inds_train[:int(inds_train.size / 2)]],
+                                y[inds_train[int(inds_train.size / 2):]]), y[inds_test]
 
-    # build and train model
-    model = get_vanilla_nn_classifier(n_classes, n_features, print_summary=False)
-    model.fit(X_train, y_train_onehot, epochs=epochs, verbose=0)
+    probs = []
+    for i in range(2):
+        X_train = X_trains[i]
+        y_train = y_trains[i]
+        y_train_onehot = to_categorical(y_train, num_classes=n_classes)
 
-    # evaluate model
-    probs_test = model.predict(X_test)
-    scores = calculate_scores(y_test, probs_test)
+        # build and train model
+        model = get_vanilla_nn_classifier(n_classes, n_features, print_summary=False)
+        model.fit(X_train, y_train_onehot, epochs=epochs, verbose=0)
 
-    # evaluate model
-    probs_test = model.predict(X_test)
-    scores_test = calculate_scores(y_test, probs_test)
+        # evaluate model
+        probs.append(model.predict(X_test))
 
-    probs_train = model.predict(X_train)
-    scores_train = calculate_scores(y_train, probs_train)
-    scores_train = {"train_" + k: v for k, v in scores_train.items()}
+    pOfDisagreement = calculate_disagreement(probs[0], probs[1])
+    # JSD = sp.distance.jensenshannon(probs[0], probs[1])
 
-    scores = scores_test
-    scores.update(scores_train)
+    scores = {
+        "Percentage of disagreement": pOfDisagreement
+    }
     return scores
 
 
@@ -149,14 +157,14 @@ def generic_train_and_evaluate(args_tuple: Tuple
     return scores
 
 
-def cross_validation(X: np.ndarray,
-                     y: np.ndarray,
-                     train_and_evaluate_fn: Callable,
-                     fn_kwargs: Dict[str, Any] = None,
-                     n_splits: int = 10,
-                     test_size: int = 0.2,
-                     multiprocess: bool = True
-                     ) -> pd.DataFrame:
+def check_stability(X: np.ndarray,
+                    y: np.ndarray,
+                    train_and_evaluate_fn: Callable,
+                    fn_kwargs: Dict[str, Any] = None,
+                    n_splits: int = 10,
+                    test_size: int = 0.1,
+                    multiprocess: bool = True
+                    ) -> pd.DataFrame:
     if multiprocess:
         pool = Pool(3)
         map_func = pool.map
@@ -175,7 +183,7 @@ def cross_validation(X: np.ndarray,
     return scores_df
 
 
-def example_cross_validation() -> None:
+def run_all() -> None:
     from data_utils import load_costa_rica_dataset
     now_str = time.strftime("%Y-%m-%d-%H-%M-%S")
 
@@ -185,7 +193,7 @@ def example_cross_validation() -> None:
 
     n_splits = 100
     # for model_type in ["xgboost", "student_nn", "vanilla_nn"]:
-    for model_type in ["xgboost", "vanilla_nn"]:
+    for model_type in ["vanilla_nn", "xgboost"]:
 
         if model_type == "vanilla_nn":
             fn_kwargs = {
@@ -217,12 +225,12 @@ def example_cross_validation() -> None:
         else:
             raise ValueError("Unsupported model type: " + model_type)
 
-        scores_df = cross_validation(X=X.values,
-                                     y=y.values,
-                                     train_and_evaluate_fn=train_and_evaluate_fn,
-                                     fn_kwargs=fn_kwargs,
-                                     n_splits=n_splits,
-                                     multiprocess=False)
+        scores_df = check_stability(X=X.values,
+                                    y=y.values,
+                                    train_and_evaluate_fn=train_and_evaluate_fn,
+                                    fn_kwargs=fn_kwargs,
+                                    n_splits=n_splits,
+                                    multiprocess=False)
 
         print(scores_df)
 
@@ -236,10 +244,11 @@ def example_cross_validation() -> None:
         with open(fn_kwargs_path, 'w') as f:
             json.dump(fn_kwargs, f, indent=2)
 
-        # hist_path = osp.join(results_dir, "scores_hist.png")
-        # plt.figure()
-        # scores_df.hist()
-        # plt.savefig(hist_path)
+            # hist_path = osp.join(results_dir, "scores_hist.png")
+            # plt.figure()
+            # scores_df.hist()
+            # plt.savefig(hist_path)
+
 
 if __name__ == '__main__':
-    example_cross_validation()
+    run_all()
