@@ -2,7 +2,7 @@ from models import get_student_nn_classifier, get_vanilla_nn_classifier
 import scipy.spatial as sp
 import numpy as np
 from sklearn.model_selection import StratifiedShuffleSplit
-from sklearn.metrics import average_precision_score, accuracy_score, f1_score
+from sklearn.metrics import average_precision_score, accuracy_score, f1_score, cohen_kappa_score
 from tensorflow.keras.utils import to_categorical
 import pandas as pd
 from multiprocessing import Pool
@@ -23,7 +23,20 @@ def calculate_disagreement(probs1: np.ndarray,
     preds1 = np.argmax(probs1, axis=1)
     preds2 = np.argmax(probs2, axis=1)
 
-    return np.sum(np.clip(np.abs(preds1 - preds2), 0, 1)) / preds1.size
+    return np.sum(np.abs(preds1 - preds2) != 0) / preds1.size
+
+
+def calculate_jsd(probs1: np.ndarray,
+                  probs2: np.ndarray
+                  ) -> int:
+    return np.average(sp.distance.jensenshannon(probs1.transpose(), probs2.transpose()))
+
+def calculate_cks(probs1: np.ndarray,
+                  probs2: np.ndarray
+                  ) -> int:
+    preds1 = np.argmax(probs1, axis=1)
+    preds2 = np.argmax(probs2, axis=1)
+    return cohen_kappa_score(preds1, preds2)
 
 
 def train_and_evaluate_student_nn(X: np.ndarray,
@@ -32,16 +45,17 @@ def train_and_evaluate_student_nn(X: np.ndarray,
                                   inds_test: np.ndarray,
                                   n_classes: int,
                                   n_features: int,
+                                  n_shap_features: int,
                                   epochs: int,
                                   xgb_max_depth: int,
                                   xgb_n_estimators: int,
                                   xgb_learning_rate: float
                                   ) -> Dict[str, np.ndarray]:
     # split data
-    X_trains, X_test = (X[inds_train[:inds_train.size / 2]],
-                        X[inds_train[inds_train.size / 2:]]), X[inds_test]
-    y_cls_trains, y_cls_test = (y[inds_train[:inds_train.size / 2]],
-                                y[inds_train[inds_train.size / 2:]]), y[inds_test]
+    X_trains, X_test = (X[inds_train[:int(inds_train.size / 2)]],
+                        X[inds_train[int(inds_train.size / 2):]]), X[inds_test]
+    y_cls_trains, y_cls_test = (y[inds_train[:int(inds_train.size / 2)]],
+                                y[inds_train[int(inds_train.size / 2):]]), y[inds_test]
 
     probs = []
     for i in range(2):
@@ -56,10 +70,11 @@ def train_and_evaluate_student_nn(X: np.ndarray,
                                   learning_rate=xgb_learning_rate,
                                   objective="multi:softmax")
         xgb_model.fit(X_train, y_cls_train)
-        y_shap_train, expected_logits = calculate_shap_values(xgb_model, X_train)
+        y_shap_train, expected_logits = calculate_shap_values(
+            xgb_model, X_train, n_shap_features)
 
         # build and train model
-        model = get_student_nn_classifier(n_classes, n_features, expected_logits, print_summary=False)
+        model = get_student_nn_classifier(n_classes, n_features, n_shap_features, expected_logits, print_summary=False)
         model.fit(X_train, [y_cls_train_onehot, y_shap_train], epochs=epochs, verbose=0)
 
         # evaluate model
@@ -67,10 +82,13 @@ def train_and_evaluate_student_nn(X: np.ndarray,
         probs.append(temp)
 
     pOfDisagreement = calculate_disagreement(probs[0], probs[1])
-    # JSD = sp.distance.jensenshannon(probs[0], probs[1])
+    JSD = calculate_jsd(probs[0], probs[1])
+    CKS = calculate_cks(probs[0], probs[1])
 
     scores = {
-        "Percentage of disagreement": pOfDisagreement
+        "Percentage of disagreement": pOfDisagreement,
+        "Jensen-Shannon divergence": JSD,
+        "Cohen-Kappa score": CKS
     }
     return scores
 
@@ -103,10 +121,13 @@ def train_and_evaluate_xgboost(X: np.ndarray,
         probs.append(xgb_model.predict_proba(X_test))
 
     pOfDisagreement = calculate_disagreement(probs[0], probs[1])
-    # JSD = sp.distance.jensenshannon(probs[0], probs[1])
+    JSD = calculate_jsd(probs[0], probs[1])
+    CKS = calculate_cks(probs[0], probs[1])
 
     scores = {
-        "Percentage of disagreement": pOfDisagreement
+        "Percentage of disagreement": pOfDisagreement,
+        "Jensen-Shannon divergence": JSD,
+        "Cohen-Kappa score": CKS
     }
     return scores
 
@@ -140,10 +161,13 @@ def train_and_evaluate_vanilla_nn(X: np.ndarray,
         probs.append(model.predict(X_test))
 
     pOfDisagreement = calculate_disagreement(probs[0], probs[1])
-    # JSD = sp.distance.jensenshannon(probs[0], probs[1])
+    JSD = calculate_jsd(probs[0], probs[1])
+    CKS = calculate_cks(probs[0], probs[1])
 
     scores = {
-        "Percentage of disagreement": pOfDisagreement
+        "Percentage of disagreement": pOfDisagreement,
+        "Jensen-Shannon divergence": JSD,
+        "Cohen-Kappa score": CKS
     }
     return scores
 
@@ -192,8 +216,7 @@ def run_all() -> None:
     n_classes = len(y.unique())
 
     n_splits = 100
-    # for model_type in ["xgboost", "student_nn", "vanilla_nn"]:
-    for model_type in ["vanilla_nn", "xgboost"]:
+    for model_type in ["student_nn", "vanilla_nn"]:
 
         if model_type == "vanilla_nn":
             fn_kwargs = {
@@ -215,6 +238,7 @@ def run_all() -> None:
             fn_kwargs = {
                 "n_classes": n_classes,
                 "n_features": n_features,
+                "n_shap_features": 10,
                 "epochs": 10,
                 "xgb_max_depth": 10,
                 "xgb_n_estimators": 30,
@@ -230,11 +254,11 @@ def run_all() -> None:
                                     train_and_evaluate_fn=train_and_evaluate_fn,
                                     fn_kwargs=fn_kwargs,
                                     n_splits=n_splits,
-                                    multiprocess=False)
+                                    multiprocess=True)
 
         print(scores_df)
 
-        results_dir = "results/" + now_str + "_" + model_type
+        results_dir = "stability_results/" + now_str + "_" + model_type
         os.makedirs(results_dir, exist_ok=True)
 
         scores_path = osp.join(results_dir, "scores.csv")
