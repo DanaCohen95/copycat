@@ -1,0 +1,61 @@
+We try to have a vanilla NN and a student NN with the same capcity.
+Fro simple nets, the capacity is a function of the number of layers
+and the number of parameters.
+One option is to have both nets to use the same architecture, but turn
+off the regression loss. However, this creates a weird classification net
+architecture, which isn't exactly vanilla.
+Another option is to strengthen the vanilla NN with more parameters
+or more layers. We decided that more layers is too much of an advantage,
+so we changed the number of neurons in the last layer of the vanilla net.
+
+
+Student NN Params:
+108*128 + (129*128)*2 + 129*40
+total params 52008
+
+1 hidden: 108*128 + 129*40 = 18984
+2 hidden: 108*128 + 129*128 + 129*40 = 35496
+
+
+Vanilla NN Params:
+108*128 + 129*128 + 129*X + (X+1)*4
+108*128 + 129*128 + 4 + 133*X
+108*128 + 129*128 + 4 + 133*163
+30340
+21668
+X = 163
+total params 52019
+
+1 hidden: 108*X + (X+1)*4 = 112X + 4 = 112*169 + 4 = 18932
+2 hidden: 108*128 + 129*X + (X+1)*4 = 108*128 + 4 + 133*X = 108*128 + 4 + 133*163 = 35507
+
+
+
+Student NN Architecture:
+input - 107
+H0 - 128
+H1 - 128
+H2 - 128
+Shap - 40
+shaps2probs - parameterless
+
+
+Vanilla NN Architecture - Chosen:
+input - 107
+H0 - 128
+H1 - 128
+H2 - X
+Pred - 4
+
+
+Vanilla NN Architecture - Not Chosen:
+input - 107
+H0 - 128
+H1 - 128
+H2 - 128
+H3 - X
+Pred - 4
+
+
+
+
