@@ -24,8 +24,8 @@ def load_xgboost_classifier(name):
 
 def fit_xgboost_classifier(X_train, y_train, max_depth=5, n_estimators=30):
     warnings.filterwarnings("ignore", category=DeprecationWarning)
-    xgb_model = MultiXGBClassifier(max_depth=max_depth, n_estimators=n_estimators, learning_rate=0.1,
-                                   objective="multi:softmax")
+    xgb_model = MultiXGBClassifier(max_depth=max_depth, n_estimators=n_estimators,
+                                   learning_rate=0.1, objective="multi:softmax", verbosity=2)
     xgb_model.fit(X_train, y_train)
     print("finish fitting xgboost")
     return xgb_model

@@ -5,20 +5,23 @@ from xgboost_utils import fit_xgboost_classifier, calculate_shap_values, \
 import numpy as np
 from sklearn.metrics import classification_report, log_loss
 
-load_saved_values = True
+load_saved_values = False
 use_weighted_shap_loss = False
 xgb_max_depth, xgb_n_estimators = 10, 100
 NUM_EPOCHS = 50
+# xgb_max_depth, xgb_n_estimators = 3, 30
+# NUM_EPOCHS = 10
 num_shap_features = 10
-model_type = "student"  # "student", "vanilla"
-dataset_name = 'costa_rica'  # 'otto' 'costa_rica' 'safe_drive'
+model_type = "vanilla"  # "student", "vanilla"
+dataset_name = 'two_sigma_connect'  # 'otto' 'costa_rica' 'safe_drive', 'two_sigma_connect'
 num_samples_to_keep = None  # None  1000
+balance_classes = False
 
 X, y = load_dataset(dataset_name)
 n_samples, n_features, n_classes, \
 X_train, X_valid, y_train, y_valid, \
 y_train_onehot, y_valid_onehot, y_onehot, \
-class_weights = prepare_data(X, y, num_samples_to_keep)
+class_weights = prepare_data(X, y, num_samples_to_keep, balance_classes)
 
 if not use_weighted_shap_loss:
     class_weights = None

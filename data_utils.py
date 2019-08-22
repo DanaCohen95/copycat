@@ -1,9 +1,19 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+from scipy.stats.morestats import _yeojohnson_transform
 from tensorflow.keras.utils import to_categorical
 from sklearn.model_selection import train_test_split, StratifiedShuffleSplit
 from typing import Tuple
+
+
+def load_two_sigma_connect_dataset() -> Tuple[pd.DataFrame, pd.Series]:
+    p = "data/two-sigma-connect-rental-listing-inquiries/sigma_train_feat_0.01_tfidf_0.05.csv"
+    df = pd.read_csv(p)
+    X = df[['bathrooms', 'bedrooms', 'latitude', 'longitude', 'price', ]
+           + [col for col in df.columns if "feat" in col or "tfidf" in col]]
+    y = df['interest_level'].apply(lambda s: 0 if s == "low" else 1 if s == "medium" else 2)
+    return X, y
 
 
 def load_costa_rica_dataset(plot_class_hist: bool = False
@@ -59,9 +69,80 @@ def load_costa_rica_dataset(plot_class_hist: bool = False
     return X, y
 
 
+def load_safe_drive_dataset():
+    df = pd.read_csv("data/safe_driver/train.csv")
+    df = df.drop(["ps_ind_05_cat", "ps_ind_14", "ps_ind_01", "ps_car_04_cat", "ps_car_09_cat", "ps_calc_12"], axis=1)
+
+    X = df.drop(['target'], axis=1).iloc[:, :]
+    y = df['target'].astype(int)
+
+    label_most_common = y.value_counts().idxmax()
+    count_second_most_common = y.value_counts().sort_values().iloc[-2]
+
+    idx_common = y.index.values[(y.values == label_most_common).nonzero()]
+    np.random.RandomState(seed=42).shuffle(idx_common)
+    idx_drop = idx_common[count_second_most_common:]
+
+    X.drop(idx_drop, axis="rows", inplace=True)
+    y.drop(idx_drop, axis="rows", inplace=True)
+    return X, y
+
+
+def load_otto_dataset():
+    df = pd.read_csv("data/otto_dataset/train.csv")
+    X = df.drop(['target', 'id'], axis=1).iloc[:, :]
+    y = df['target'].str.split('_', expand=True)[1].astype(int) - 1
+    return X, y
+
+
+def load_dataset(dataset_name):
+    print("loading {} dataset".format(dataset_name))
+    if dataset_name == 'costa_rica':
+        return load_costa_rica_dataset()
+    elif dataset_name == 'safe_drive':
+        return load_safe_drive_dataset()
+    elif dataset_name == 'otto':
+        return load_otto_dataset()
+    elif dataset_name == 'two_sigma_connect':
+        return load_two_sigma_connect_dataset()
+    else:
+        raise ValueError("Unknown dataset: {}".format(dataset_name))
+
+
+def resample_class(cls_inds, max_y):
+    rs = np.random.RandomState(34)
+    perm = rs.permutation(len(cls_inds))
+    cls_inds = cls_inds[perm]
+
+    num_reps = int(np.ceil(max_y / len(cls_inds)))
+    _resample_inds = np.hstack([cls_inds] * num_reps)
+    _resample_inds = _resample_inds[:max_y]
+    return _resample_inds
+
+
+def resample_for_class_balancing(X_train: pd.DataFrame,
+                                 y_train: pd.Series
+                                 ) -> Tuple[pd.DataFrame, pd.Series]:
+    y_counts = y_train.value_counts()
+    max_y = y_counts.max()
+
+    resample_inds = []
+    for cls in y_counts.index:
+        cls_inds = np.nonzero((y_train == cls).values)[0]
+        _resample_inds = resample_class(cls_inds, max_y)
+        resample_inds.extend(_resample_inds)
+    np.random.RandomState(34).shuffle(resample_inds)
+
+    X_train_resample = X_train.iloc[resample_inds]
+    y_train_resample = y_train.iloc[resample_inds]
+
+    return X_train_resample, y_train_resample
+
+
 def prepare_data(X: pd.DataFrame,
                  y: pd.Series,
-                 num_samples_to_keep: int = None
+                 num_samples_to_keep: int = None,
+                 balance_classes=False
                  ) -> Tuple[int, int, int,
                             pd.DataFrame, pd.DataFrame, pd.Series, pd.Series,
                             np.ndarray, np.ndarray, np.ndarray,
@@ -95,6 +176,8 @@ def prepare_data(X: pd.DataFrame,
 
     X_train, X_valid, y_train, y_valid = train_test_split(X, y, test_size=0.2, random_state=34,
                                                           shuffle=True, stratify=y.values)
+    if balance_classes:
+        X_train, y_train = resample_for_class_balancing(X_train, y_train)
 
     y_train_onehot = to_categorical(y_train, num_classes=n_classes)
     y_valid_onehot = to_categorical(y_valid, num_classes=n_classes)
@@ -110,38 +193,3 @@ def prepare_data(X: pd.DataFrame,
             X_train, X_valid, y_train, y_valid,
             y_train_onehot, y_valid_onehot, y_onehot,
             class_weights)
-
-
-def load_safe_drive_dataset():
-    df = pd.read_csv("data/safe_driver/train.csv")
-    df = df.drop(["ps_ind_05_cat", "ps_ind_14", "ps_ind_01", "ps_car_04_cat", "ps_car_09_cat", "ps_calc_12"], axis=1)
-
-    X = df.drop(['target'], axis=1).iloc[:, :]
-    y = df['target'].astype(int)
-
-    label_most_common = y.value_counts().idxmax()
-    count_second_most_common = y.value_counts().sort_values().iloc[-2]
-
-    idx_common = y.index.values[(y.values == label_most_common).nonzero()]
-    np.random.RandomState(seed=42).shuffle(idx_common)
-    idx_drop = idx_common[count_second_most_common:]
-
-    X.drop(idx_drop, axis="rows", inplace=True)
-    y.drop(idx_drop, axis="rows", inplace=True)
-    return X, y
-
-
-def load_otto_dataset():
-    df = pd.read_csv("data/otto_dataset/train.csv")
-    X = df.drop(['target', 'id'], axis=1).iloc[:, :]
-    y = df['target'].str.split('_', expand=True)[1].astype(int) - 1
-    return X, y
-
-def load_dataset(dataset_name):
-    print("loading {dataset_name} dataset".format(dataset_name=dataset_name))
-    if dataset_name is 'costa_rica':
-        return load_costa_rica_dataset()
-    if dataset_name is 'safe_drive':
-        return load_safe_drive_dataset()
-    if dataset_name is 'otto':
-        return load_otto_dataset()
