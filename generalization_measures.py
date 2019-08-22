@@ -39,6 +39,7 @@ def train_and_evaluate_student_nn(X: np.ndarray,
                                   inds_test: np.ndarray,
                                   n_classes: int,
                                   n_features: int,
+                                  n_shap_features: int,
                                   epochs: int,
                                   xgb_max_depth: int,
                                   xgb_n_estimators: int,
@@ -56,10 +57,11 @@ def train_and_evaluate_student_nn(X: np.ndarray,
                               learning_rate=xgb_learning_rate,
                               objective="multi:softmax")
     xgb_model.fit(X_train, y_cls_train)
-    y_shap_train, expected_logits = calculate_shap_values(xgb_model, X_train)
+    y_shap_train, expected_logits = calculate_shap_values(
+        xgb_model, X_train, n_shap_features)
 
     # build and train model
-    model = get_student_nn_classifier(n_classes, n_features, expected_logits, print_summary=False)
+    model = get_student_nn_classifier(n_classes, n_features, n_shap_features, expected_logits, print_summary=False)
     model.fit(X_train, [y_cls_train_onehot, y_shap_train], epochs=epochs, verbose=0)
 
     # evaluate model
@@ -207,6 +209,7 @@ def example_cross_validation() -> None:
             fn_kwargs = {
                 "n_classes": n_classes,
                 "n_features": n_features,
+                "n_shap_features": 10,
                 "epochs": 10,
                 "xgb_max_depth": 10,
                 "xgb_n_estimators": 30,
@@ -222,7 +225,7 @@ def example_cross_validation() -> None:
                                      train_and_evaluate_fn=train_and_evaluate_fn,
                                      fn_kwargs=fn_kwargs,
                                      n_splits=n_splits,
-                                     multiprocess=True)
+                                     multiprocess=False)
 
         print(scores_df)
 
