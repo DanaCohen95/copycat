@@ -7,12 +7,12 @@ from sklearn.metrics import classification_report, log_loss
 
 load_saved_values = True
 use_weighted_shap_loss = False
-xgb_max_depth, xgb_n_estimators = 10, 100
+xgb_max_depth, xgb_n_estimators = 5, 30
 NUM_EPOCHS = 50
 num_shap_features = 10
 model_type = "student"  # "student", "vanilla"
-dataset_name = 'costa_rica'  # 'otto' 'costa_rica' 'safe_drive'
-num_samples_to_keep = None  # None  1000
+dataset_name = 'fraud_only_transactions'  # 'fraud'  'fraud_only_transactions'  'otto' 'costa_rica' 'safe_drive'
+num_samples_to_keep = 1000  # None  1000
 
 X, y = load_dataset(dataset_name)
 n_samples, n_features, n_classes, \
@@ -50,11 +50,11 @@ if model_type == "student":
     model = get_student_nn_classifier(n_classes, n_features, num_shap_features,
                                       expected_logits, class_weights=class_weights)
 
-    model.fit(X_train.values, [y_train_onehot, shap_values_train],
-              validation_data=(X_valid.values, [y_valid_onehot, shap_values_valid]),
+    model.fit(X_train.fillna(-1).values, [y_train_onehot, shap_values_train],
+              validation_data=(X_valid.fillna(-1).values, [y_valid_onehot, shap_values_valid]),
               epochs=NUM_EPOCHS)
 
-    scores, shaps = model.predict(X_valid.values)
+    scores, shaps = model.predict(X_valid.fillna(-1).values)
     preds = np.argmax(scores, axis=1)
     print("\n\n\n")
     print("Student NN classification report:")

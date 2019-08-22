@@ -2,8 +2,9 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from tensorflow.keras.utils import to_categorical
-from sklearn.model_selection import train_test_split, StratifiedShuffleSplit
+from sklearn.model_selection import train_test_split
 from typing import Tuple
+import os.path as osp
 
 
 def load_costa_rica_dataset(plot_class_hist: bool = False
@@ -128,11 +129,52 @@ def load_otto_dataset():
     return X, y
 
 
-def load_dataset(dataset_name):
+def preprocess_fraud_data(df: pd.DataFrame
+                          ) -> pd.DataFrame:
+    cat_fields = ["ProductCD", "card4", "card6", "M4"]
+    df_cat = df[cat_fields].copy()
+    df_cat = pd.get_dummies(df_cat)
+
+    TrueFalse_fields = ["M1", "M2", "M3", "M5", "M6", "M7", "M8", "M9"]
+    df_TF = df[TrueFalse_fields].copy()
+    df_TF[~df_TF.isna()] = df_TF[~df_TF.isna()] == 'T'
+    df_TF = df_TF.astype(float)
+
+    leakage_fields = ["TransactionID", "isFraud"]
+    problematic_fields = ["P_emaildomain", "R_emaildomain", "TransactionDT"]
+
+    X = df.drop(leakage_fields + problematic_fields + TrueFalse_fields + cat_fields, axis="columns")
+    X = pd.concat([X, df_cat, df_TF], axis="columns")
+    return X
+
+
+def load_fraud_dataset(only_transactions=False):
+    data_dir = "data/ieee-fraud-detection"
+    p_trans = osp.join(data_dir, "train_transaction.csv")
+    p_identity = osp.join(data_dir, "train_identity.csv")
+
+    df_trans = pd.read_csv(p_trans)
+    if only_transactions:
+        df = df_trans
+    else:
+        df_identity = pd.read_csv(p_identity)
+        df = pd.merge(df_trans, df_identity, how="outer", on="TransactionID")
+
+    X = preprocess_fraud_data(df)
+    y = df["isFraud"]
+    return X, y
+
+
+def load_dataset(dataset_name: str
+                 ) -> Tuple[pd.DataFrame, pd.Series]:
     print("loading {dataset_name} dataset".format(dataset_name=dataset_name))
-    if dataset_name is 'costa_rica':
+    if dataset_name == 'costa_rica':
         return load_costa_rica_dataset()
-    if dataset_name is 'safe_drive':
+    elif dataset_name == 'safe_drive':
         return load_safe_drive_dataset()
-    if dataset_name is 'otto':
+    elif dataset_name == 'otto':
         return load_otto_dataset()
+    elif dataset_name == "fraud":
+        return load_fraud_dataset()
+    elif dataset_name == "fraud_only_transactions":
+        return load_fraud_dataset(only_transactions=True)
