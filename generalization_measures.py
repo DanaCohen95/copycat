@@ -12,7 +12,7 @@ from xgboost import XGBClassifier
 from xgboost_utils import calculate_shap_values
 import warnings
 import json
-import matplotlib.pyplot as plt
+from tqdm import tqdm
 import time
 
 
@@ -144,10 +144,10 @@ def train_and_evaluate_vanilla_nn(X: np.ndarray,
 
 def generic_train_and_evaluate(args_tuple: Tuple
                                ) -> Dict[str, np.ndarray]:
-    print("pid {pid}: started train_and_evaluate".format(pid=os.getpid()))
+    # print("pid {pid}: started train_and_evaluate".format(pid=os.getpid()))
     X, y, inds_train, inds_test, train_and_evaluate_fn, fn_kwargs = args_tuple
     scores = train_and_evaluate_fn(X, y, inds_train, inds_test, **fn_kwargs)
-    print("pid {pid}: finished train_and_evaluate".format(pid=os.getpid()))
+    # print("pid {pid}: finished train_and_evaluate".format(pid=os.getpid()))
     return scores
 
 
@@ -157,11 +157,12 @@ def cross_validation(X: np.ndarray,
                      fn_kwargs: Dict[str, Any] = None,
                      n_splits: int = 10,
                      test_size: int = 0.2,
-                     multiprocess: bool = True
+                     multiprocess: bool = True,
+                     tqdm_description: str=None,
                      ) -> pd.DataFrame:
     if multiprocess:
         pool = Pool(3)
-        map_func = pool.map
+        map_func = pool.imap
     else:
         map_func = map
 
@@ -172,7 +173,7 @@ def cross_validation(X: np.ndarray,
     folds = list(cv.split(np.zeros(X.shape[0]), y))
     packed_args_list = [(X, y, inds_train, inds_test, train_and_evaluate_fn, fn_kwargs)
                         for inds_train, inds_test in folds]
-    all_scores = list(map_func(generic_train_and_evaluate, packed_args_list))
+    all_scores = list(map_func(generic_train_and_evaluate, tqdm(packed_args_list, desc=tqdm_description)))
     scores_df = pd.DataFrame(all_scores)
     return scores_df
 
@@ -187,20 +188,20 @@ def example_cross_validation() -> None:
 
     n_splits = 100
     # for model_type in ["xgboost", "student_nn", "vanilla_nn"]:
-    for model_type in ["xgboost", "vanilla_nn"]:
+    for model_type in ["xgboost", "vanilla_nn", "student_nn"]:
 
         if model_type == "vanilla_nn":
             fn_kwargs = {
                 "n_classes": n_classes,
                 "n_features": n_features,
-                "epochs": 50
+                "epochs": 15
             }
             train_and_evaluate_fn = train_and_evaluate_vanilla_nn
 
         elif model_type == "xgboost":
             fn_kwargs = {
                 "max_depth": 10,
-                "n_estimators": 100,
+                "n_estimators": 30,
                 "learning_rate": 0.1
             }
             train_and_evaluate_fn = train_and_evaluate_xgboost
@@ -210,7 +211,7 @@ def example_cross_validation() -> None:
                 "n_classes": n_classes,
                 "n_features": n_features,
                 "n_shap_features": 10,
-                "epochs": 10,
+                "epochs": 15,
                 "xgb_max_depth": 10,
                 "xgb_n_estimators": 30,
                 "xgb_learning_rate": 0.1
@@ -225,11 +226,12 @@ def example_cross_validation() -> None:
                                      train_and_evaluate_fn=train_and_evaluate_fn,
                                      fn_kwargs=fn_kwargs,
                                      n_splits=n_splits,
-                                     multiprocess=False)
+                                     multiprocess=False,
+                                     tqdm_description=model_type)
 
         print(scores_df)
 
-        results_dir = "results/" + now_str + "_" + model_type
+        results_dir = osp.join("results", now_str, model_type)
         os.makedirs(results_dir, exist_ok=True)
 
         scores_path = osp.join(results_dir, "scores.csv")
@@ -239,10 +241,11 @@ def example_cross_validation() -> None:
         with open(fn_kwargs_path, 'w') as f:
             json.dump(fn_kwargs, f, indent=2)
 
-        # hist_path = osp.join(results_dir, "scores_hist.png")
-        # plt.figure()
-        # scores_df.hist()
-        # plt.savefig(hist_path)
+            # hist_path = osp.join(results_dir, "scores_hist.png")
+            # plt.figure()
+            # scores_df.hist()
+            # plt.savefig(hist_path)
+
 
 if __name__ == '__main__':
     example_cross_validation()
