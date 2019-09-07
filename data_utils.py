@@ -1,10 +1,10 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.stats.morestats import _yeojohnson_transform
 from tensorflow.keras.utils import to_categorical
-from sklearn.model_selection import train_test_split, StratifiedShuffleSplit
+from sklearn.model_selection import train_test_split
 from typing import Tuple
+from sklearn.preprocessing import RobustScaler
 
 
 def load_two_sigma_connect_dataset() -> Tuple[pd.DataFrame, pd.Series]:
@@ -109,7 +109,7 @@ def load_dataset(dataset_name):
         raise ValueError("Unknown dataset: {}".format(dataset_name))
 
 
-def resample_class(cls_inds, max_y):
+def over_sample_class(cls_inds, max_y):
     rs = np.random.RandomState(34)
     perm = rs.permutation(len(cls_inds))
     cls_inds = cls_inds[perm]
@@ -120,16 +120,16 @@ def resample_class(cls_inds, max_y):
     return _resample_inds
 
 
-def resample_for_class_balancing(X_train: pd.DataFrame,
-                                 y_train: pd.Series
-                                 ) -> Tuple[pd.DataFrame, pd.Series]:
+def over_sample_for_class_balancing(X_train: pd.DataFrame,
+                                    y_train: pd.Series
+                                    ) -> Tuple[pd.DataFrame, pd.Series]:
     y_counts = y_train.value_counts()
     max_y = y_counts.max()
 
     resample_inds = []
     for cls in y_counts.index:
         cls_inds = np.nonzero((y_train == cls).values)[0]
-        _resample_inds = resample_class(cls_inds, max_y)
+        _resample_inds = over_sample_class(cls_inds, max_y)
         resample_inds.extend(_resample_inds)
     np.random.RandomState(34).shuffle(resample_inds)
 
@@ -139,10 +139,31 @@ def resample_for_class_balancing(X_train: pd.DataFrame,
     return X_train_resample, y_train_resample
 
 
+def under_sample_for_class_balancing(X_train: pd.DataFrame,
+                                     y_train: pd.Series
+                                     ) -> Tuple[pd.DataFrame, pd.Series]:
+    y_counts = y_train.value_counts()
+    min_y = y_counts.min()
+
+    keep_inds = []
+    for cls in y_counts.index:
+        cls_inds = np.nonzero((y_train == cls).values)[0]
+        perm = np.random.RandomState(34).permutation(len(cls_inds))
+        _keep_inds = cls_inds[perm[:min_y]]
+        keep_inds.extend(_keep_inds)
+    np.random.RandomState(34).shuffle(keep_inds)
+
+    X_train_clip = X_train.iloc[keep_inds]
+    y_train_clip = y_train.iloc[keep_inds]
+
+    return X_train_clip, y_train_clip
+
+
 def prepare_data(X: pd.DataFrame,
                  y: pd.Series,
                  num_samples_to_keep: int = None,
-                 balance_classes=False
+                 class_balancing_strategy: str = None,
+                 normalize_features: bool = False
                  ) -> Tuple[int, int, int,
                             pd.DataFrame, pd.DataFrame, pd.Series, pd.Series,
                             np.ndarray, np.ndarray, np.ndarray,
@@ -176,8 +197,17 @@ def prepare_data(X: pd.DataFrame,
 
     X_train, X_valid, y_train, y_valid = train_test_split(X, y, test_size=0.2, random_state=34,
                                                           shuffle=True, stratify=y.values)
-    if balance_classes:
-        X_train, y_train = resample_for_class_balancing(X_train, y_train)
+    if class_balancing_strategy == "over_sample":
+        X_train, y_train = over_sample_for_class_balancing(X_train, y_train)
+    elif class_balancing_strategy == "under_sample":
+        X_train, y_train = under_sample_for_class_balancing(X_train, y_train)
+
+    if normalize_features:
+        scaler = RobustScaler().fit(X_train)
+        X_train_np = scaler.transform(X_train)
+        X_train = pd.DataFrame(data=X_train_np, columns=X_train.columns)
+        X_valid_np = scaler.transform(X_valid)
+        X_valid = pd.DataFrame(data=X_valid_np, columns=X_valid.columns)
 
     y_train_onehot = to_categorical(y_train, num_classes=n_classes)
     y_valid_onehot = to_categorical(y_valid, num_classes=n_classes)
