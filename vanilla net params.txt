@@ -30,6 +30,10 @@ total params 52019
 2 hidden: 108*128 + 129*X + (X+1)*4 = 108*128 + 4 + 133*X = 108*128 + 4 + 133*163 = 35507
 
 
+two_sigma_connect dataset
+Student, 1 hidden: (255+1)*128 + 129*30 = 36638
+Vanilla, 1 hidden: (255+1)*141 + (141+1)*3 = 36522
+
 
 Student NN Architecture:
 input - 107

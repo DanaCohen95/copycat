@@ -10,9 +10,17 @@ from sklearn.preprocessing import RobustScaler
 def load_two_sigma_connect_dataset() -> Tuple[pd.DataFrame, pd.Series]:
     p = "data/two-sigma-connect-rental-listing-inquiries/sigma_train_feat_0.01_tfidf_0.05.csv"
     df = pd.read_csv(p)
-    X = df[['bathrooms', 'bedrooms', 'latitude', 'longitude', 'price', ]
-           + [col for col in df.columns if "feat" in col or "tfidf" in col]]
+    X = df[['bathrooms', 'bedrooms', 'latitude', 'longitude', 'price']
+           + [col for col in df.columns if "feat_" in col]]
+    X = X[X.columns[np.nonzero((X != 0).mean() >= 0.05)]]
+    # X = df[['bathrooms', 'bedrooms', 'latitude', 'longitude', 'price']
+    #        + [col for col in df.columns if "feat" in col or "tfidf" in col]]
+    # X = df[['bathrooms', 'bedrooms', 'latitude', 'longitude', 'price',
+    #         "feat_laundry", "feat_elevator", "feat_hardwood", "feat_catsallowed", "feat_dogsallowed"]]
+    # X = df[['bathrooms', 'bedrooms', 'latitude', 'longitude', 'price']]
+    print(X.columns)
     y = df['interest_level'].apply(lambda s: 0 if s == "low" else 1 if s == "medium" else 2)
+    print("num features:", X.shape[1])
     return X, y
 
 
@@ -223,3 +231,17 @@ def prepare_data(X: pd.DataFrame,
             X_train, X_valid, y_train, y_valid,
             y_train_onehot, y_valid_onehot, y_onehot,
             class_weights)
+
+
+def prepare_two_sigma_connect_data(X_train: np.ndarray,
+                                   y_train: np.ndarray,
+                                   X_test: np.ndarray
+                                   ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    X_train, y_train = under_sample_for_class_balancing(pd.DataFrame(X_train), pd.Series(y_train))
+    X_train, y_train = X_train.values, y_train.values
+
+    scaler = RobustScaler().fit(X_train)
+    X_train = scaler.transform(X_train)
+    X_test = scaler.transform(X_test)
+
+    return X_train, y_train, X_test

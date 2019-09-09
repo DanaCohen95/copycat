@@ -5,14 +5,30 @@ from model_utils import shaps_to_probs, weighted_MSE_loss, zero_loss
 from typing import Union
 import pandas as pd
 
+
 def get_vanilla_nn_classifier(n_classes: int,
                               n_features: int,
                               print_summary: bool = True,
                               ) -> keras.Sequential:
     """ Create a simple neural network for multiclass classification """
     model = keras.models.Sequential()
-    model.add(keras.layers.Dense(units=128, activation="relu", input_dim=n_features))
-    model.add(keras.layers.Dense(units=163, activation="relu", input_dim=n_features))
+    # model.add(keras.layers.Dense(units=128, activation="relu", input_dim=n_features))
+    # model.add(keras.layers.Dense(units=163, activation="relu", input_dim=n_features))
+    model.add(keras.layers.Dense(units=16, activation="relu", input_dim=n_features))
+    model.add(keras.layers.Dense(units=n_classes, activation="softmax"))
+    model.compile("adam", "categorical_crossentropy", metrics=["accuracy"])
+    if print_summary:
+        model.summary()
+    return model
+
+
+def get_vanilla_2sigma(n_classes: int,
+                       n_features: int,
+                       print_summary: bool = True,
+                       ) -> keras.Sequential:
+    """ Create a simple neural network for multiclass classification """
+    model = keras.models.Sequential()
+    model.add(keras.layers.Dense(units=141, activation="relu", input_dim=n_features))
     model.add(keras.layers.Dense(units=n_classes, activation="softmax"))
     model.compile("adam", "categorical_crossentropy", metrics=["accuracy"])
     if print_summary:
@@ -46,8 +62,9 @@ def get_student_nn_classifier(n_classes: int,
     assert use_shap_loss or use_score_loss, "at least one of 'use_shap_loss', 'use_score_loss' must be True"
 
     l_input = keras.layers.Input(shape=(n_features,), name="input")
-    l_hidden0 = keras.layers.Dense(units=128, activation="relu", name="hidden0")(l_input)
-    if add_layers:
+    l_hidden0 = keras.layers.Dense(units=13, activation="relu", name="hidden0")(l_input)
+    # if add_layers:
+    if False:
         l_hidden1 = keras.layers.Dense(units=128, activation="relu", name="hidden1")(l_hidden0)
         l_shaps_flat = keras.layers.Dense(units=n_classes * num_shap_features, name="shaps_flat")(l_hidden1)
     else:
@@ -68,7 +85,36 @@ def get_student_nn_classifier(n_classes: int,
             return weighted_MSE_loss(y_true, y_pred, weights=class_weights)
 
     model.compile(optimizer="adam",
-                  loss=["categorical_crossentropy", shap_loss], #zero_loss
+                  loss=["categorical_crossentropy", shap_loss],  # zero_loss
+                  loss_weights=[float(use_score_loss), float(use_shap_loss)],
+                  metrics={"score": ["accuracy"]})
+    return model
+
+
+def get_student2sigma(n_classes: int,
+                      n_features: int,
+                      num_shap_features: int,
+                      expected_logits: np.ndarray,
+                      use_shap_loss: bool = True,
+                      use_score_loss: bool = True,
+                      print_summary: bool = True,
+                      ) -> keras.Model:
+    assert use_shap_loss or use_score_loss, "at least one of 'use_shap_loss', 'use_score_loss' must be True"
+
+    l_input = keras.layers.Input(shape=(n_features,), name="input")
+    l_hidden0 = keras.layers.Dense(units=128, activation="relu", name="hidden0")(l_input)
+    l_shaps_flat = keras.layers.Dense(units=n_classes * num_shap_features, name="shaps_flat")(l_hidden0)
+    l_shaps = keras.layers.Reshape((n_classes, num_shap_features), name="shaps")(l_shaps_flat)
+    l_score = keras.layers.Lambda(
+        lambda shaps: shaps_to_probs(shaps, expected_logits), output_shape=(n_classes,), name="score")(l_shaps)
+
+    model = keras.models.Model(inputs=l_input, outputs=[l_score, l_shaps])
+
+    if print_summary:
+        model.summary()
+
+    model.compile(optimizer="adam",
+                  loss=["categorical_crossentropy", "mean_squared_error"],
                   loss_weights=[float(use_score_loss), float(use_shap_loss)],
                   metrics={"score": ["accuracy"]})
     return model

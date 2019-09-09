@@ -1,4 +1,5 @@
 from models import get_student_nn_classifier, get_vanilla_nn_classifier
+from models import get_student2sigma, get_vanilla_2sigma
 from data_utils import prepare_data, load_dataset
 from xgboost_utils import fit_xgboost_classifier, calculate_shap_values, \
     save_xgboost_classifier, load_xgboost_classifier
@@ -6,16 +7,16 @@ import numpy as np
 from sklearn.metrics import classification_report, log_loss
 
 load_saved_values = False
-save_values = True
+save_values = False
 use_weighted_shap_loss = False
 xgb_max_depth, xgb_n_estimators = 10, 30
 NUM_EPOCHS = 15
 
-num_shap_features = 10
+num_shap_features = 3
 model_type = "student"  # "student", "vanilla"
 dataset_name = 'two_sigma_connect'  # 'otto' 'costa_rica' 'safe_drive', 'two_sigma_connect'
 num_samples_to_keep = None  # None  1000
-class_balancing_strategy = "under_sample"  # "over_sample", "under_sample", None
+class_balancing_strategy = None  # "over_sample", "under_sample", None
 normalize_features = True
 
 X, y = load_dataset(dataset_name)
@@ -34,16 +35,37 @@ if model_type == "student":
         xgb_model = load_xgboost_classifier(
             'experiments/{dataset_name}/xgb_depth_{xgb_max_depth}_estimators_{xgb_n_estimators}'.format(
                 dataset_name=dataset_name, xgb_max_depth=xgb_max_depth, xgb_n_estimators=xgb_n_estimators))
+    else:
+        xgb_model = fit_xgboost_classifier(X_train, y_train, max_depth=xgb_max_depth, n_estimators=xgb_n_estimators)
+
+    scores = xgb_model.predict_proba(X_valid)
+    preds = np.argmax(scores, axis=1)
+    print("\n\n\n")
+    print("XGBoost classification report:")
+    print(classification_report(y_valid.values, preds))
+    print("log_loss:", log_loss(y_valid.values, scores))
+
+    scores = xgb_model.predict_proba(X_train)
+    preds = np.argmax(scores, axis=1)
+    print("\n\n\n")
+    print("XGBoost TRAIN classification report:")
+    print(classification_report(y_train.values, preds))
+    print("log_loss:", log_loss(y_train.values, scores))
+
+    if load_saved_values:
         shap_values_train, expected_logits = calculate_shap_values(
             xgb_model, X_train, num_shap_features,
             file_path='experiments/{dataset_name}/train_shap_values.npy'.format(dataset_name=dataset_name))
-        shap_values_valid, _ = calculate_shap_values(
-            xgb_model, X_valid, num_shap_features,
-            file_path='experiments/{dataset_name}/valid_shap_values.npy'.format(dataset_name=dataset_name))
+        # shap_values_valid, _ = calculate_shap_values(
+        #     xgb_model, X_valid, num_shap_features,
+        #     file_path='experiments/{dataset_name}/valid_shap_values.npy'.format(dataset_name=dataset_name))
+        shap_values_valid = np.zeros((len(X_valid), n_classes, num_shap_features))
     else:
-        xgb_model = fit_xgboost_classifier(X_train, y_train, max_depth=xgb_max_depth, n_estimators=xgb_n_estimators)
+        print("Calculating SHAP values")
         shap_values_train, expected_logits = calculate_shap_values(xgb_model, X_train, num_shap_features)
-        shap_values_valid, _ = calculate_shap_values(xgb_model, X_valid, num_shap_features)
+        print("Finished SHAP calculation")
+        # shap_values_valid, _ = calculate_shap_values(xgb_model, X_valid, num_shap_features)
+        shap_values_valid = np.zeros((len(X_valid), n_classes, num_shap_features))
         if save_values:
             save_xgboost_classifier(xgb_model,
                                     'experiments/{dataset_name}/xgb_depth_{xgb_max_depth}_estimators_{xgb_n_estimators}'.format(
@@ -53,11 +75,14 @@ if model_type == "student":
                     shap_values_train)
             np.save('experiments/{dataset_name}/expected_logits.npy'.format(dataset_name=dataset_name),
                     expected_logits)
-            np.save('experiments/{dataset_name}/valid_shap_values.npy'.format(dataset_name=dataset_name),
-                    shap_values_valid)
+            # np.save('experiments/{dataset_name}/valid_shap_values.npy'.format(dataset_name=dataset_name),
+            #         shap_values_valid)
 
-    model = get_student_nn_classifier(n_classes, n_features, num_shap_features,
-                                      expected_logits, class_weights=class_weights)
+    if False and dataset_name == "two_sigma_connect":
+        model = get_student2sigma(n_classes, n_features, num_shap_features, expected_logits)
+    else:
+        model = get_student_nn_classifier(n_classes, n_features, num_shap_features,
+                                          expected_logits, class_weights=class_weights)
 
     model.fit(X_train.values, [y_train_onehot, shap_values_train],
               validation_data=(X_valid.values, [y_valid_onehot, shap_values_valid]),
@@ -70,13 +95,6 @@ if model_type == "student":
     print(classification_report(y_valid.values, preds))
     print("log_loss:", log_loss(y_valid.values, scores))
 
-    scores = xgb_model.predict_proba(X_valid)
-    preds = np.argmax(scores, axis=1)
-    print("\n\n\n")
-    print("XGBoost classification report:")
-    print(classification_report(y_valid.values, preds))
-    print("log_loss:", log_loss(y_valid.values, scores))
-
     scores, shaps = model.predict(X_train.values)
     preds = np.argmax(scores, axis=1)
     print("\n\n\n")
@@ -84,15 +102,13 @@ if model_type == "student":
     print(classification_report(y_train.values, preds))
     print("log_loss:", log_loss(y_train.values, scores))
 
-    scores = xgb_model.predict_proba(X_train)
-    preds = np.argmax(scores, axis=1)
-    print("\n\n\n")
-    print("XGBoost TRAIN classification report:")
-    print(classification_report(y_train.values, preds))
-    print("log_loss:", log_loss(y_train.values, scores))
 
 elif model_type == "vanilla":
-    model = get_vanilla_nn_classifier(n_classes, n_features)
+    if False and dataset_name == "two_sigma_connect":
+        model = get_vanilla_2sigma(n_classes, n_features)
+    else:
+        model = get_vanilla_nn_classifier(n_classes, n_features)
+
     model.fit(X_train.values, y_train_onehot,
               validation_data=(X_valid.values, y_valid_onehot),
               epochs=NUM_EPOCHS)

@@ -1,7 +1,8 @@
 from models import get_student_nn_classifier, get_vanilla_nn_classifier
+from models import get_student2sigma, get_vanilla_2sigma
 import numpy as np
 from sklearn.model_selection import StratifiedShuffleSplit
-from sklearn.metrics import average_precision_score, accuracy_score, f1_score
+from sklearn.metrics import accuracy_score, f1_score
 from tensorflow.keras.utils import to_categorical
 import pandas as pd
 from multiprocessing import Pool
@@ -21,13 +22,13 @@ def calculate_scores(y: Union[np.ndarray, pd.Series],
                      ) -> Dict[str, np.ndarray]:
     if np.ndim(y) == 2:
         y = np.argmax(y, axis=1)
-    n_classes = probs.shape[1]
+    # n_classes = probs.shape[1]
     preds = np.argmax(probs, axis=1)
 
     scores = {
         "accuracy": accuracy_score(y, preds),
-        "average_precision_macro": average_precision_score(
-            to_categorical(y, num_classes=n_classes), probs, average="macro"),
+        # "average_precision_macro": average_precision_score(
+        #     to_categorical(y, num_classes=n_classes), probs, average="macro"),
         "f1_macro": f1_score(y, preds, average="macro")
     }
     return scores
@@ -43,11 +44,16 @@ def train_and_evaluate_student_nn(X: np.ndarray,
                                   epochs: int,
                                   xgb_max_depth: int,
                                   xgb_n_estimators: int,
-                                  xgb_learning_rate: float
+                                  xgb_learning_rate: float,
+                                  data_preparation_func: Callable
                                   ) -> Dict[str, np.ndarray]:
     # split data
     X_train, X_test = X[inds_train], X[inds_test]
     y_cls_train, y_cls_test = y[inds_train], y[inds_test]
+
+    if data_preparation_func is not None:
+        X_train, y_cls_train, X_test = data_preparation_func(X_train, y_cls_train, X_test)
+
     y_cls_train_onehot = to_categorical(y_cls_train, num_classes=n_classes)
 
     # build and train XGBoost model, calculate shap values
@@ -62,6 +68,8 @@ def train_and_evaluate_student_nn(X: np.ndarray,
 
     # build and train model
     model = get_student_nn_classifier(n_classes, n_features, n_shap_features, expected_logits, print_summary=False)
+    # model = get_student2sigma(n_classes, n_features, n_shap_features, expected_logits, print_summary=False)
+
     model.fit(X_train, [y_cls_train_onehot, y_shap_train], epochs=epochs, verbose=0)
 
     # evaluate model
@@ -81,13 +89,17 @@ def train_and_evaluate_xgboost(X: np.ndarray,
                                y: Tuple[np.ndarray, np.ndarray],
                                inds_train: np.ndarray,
                                inds_test: np.ndarray,
-                               max_depth: int = 5,
-                               n_estimators: int = 30,
-                               learning_rate: float = 0.1
+                               max_depth: int,
+                               n_estimators: int,
+                               learning_rate: float,
+                               data_preparation_func: Callable
                                ) -> Dict[str, np.ndarray]:
     # split data
     X_train, X_test = X[inds_train], X[inds_test]
     y_train, y_test = y[inds_train], y[inds_test]
+
+    if data_preparation_func is not None:
+        X_train, y_train, X_test = data_preparation_func(X_train, y_train, X_test)
 
     # build and train model
     warnings.filterwarnings("ignore", category=DeprecationWarning)
@@ -114,15 +126,22 @@ def train_and_evaluate_vanilla_nn(X: np.ndarray,
                                   inds_test: np.ndarray,
                                   n_classes: int,
                                   n_features: int,
-                                  epochs: int
+                                  epochs: int,
+                                  data_preparation_func: Callable
                                   ) -> Dict[str, np.ndarray]:
     # split data
     X_train, X_test = X[inds_train], X[inds_test]
     y_train, y_test = y[inds_train], y[inds_test]
+
+    if data_preparation_func is not None:
+        X_train, y_train, X_test = data_preparation_func(X_train, y_train, X_test)
+
     y_train_onehot = to_categorical(y_train, num_classes=n_classes)
 
     # build and train model
     model = get_vanilla_nn_classifier(n_classes, n_features, print_summary=False)
+    # model = get_vanilla_2sigma(n_classes, n_features, print_summary=False)
+
     model.fit(X_train, y_train_onehot, epochs=epochs, verbose=0)
 
     # evaluate model
@@ -158,7 +177,7 @@ def cross_validation(X: np.ndarray,
                      n_splits: int = 10,
                      test_size: int = 0.2,
                      multiprocess: bool = True,
-                     tqdm_description: str=None,
+                     tqdm_description: str = None,
                      ) -> pd.DataFrame:
     if multiprocess:
         pool = Pool(3)
@@ -179,22 +198,31 @@ def cross_validation(X: np.ndarray,
 
 
 def example_cross_validation() -> None:
-    from data_utils import load_costa_rica_dataset
+    from data_utils import load_dataset, prepare_two_sigma_connect_data
     now_str = time.strftime("%Y-%m-%d-%H-%M-%S")
 
-    X, y = load_costa_rica_dataset()
+    # dataset_name = "costa_rica"
+    # data_preparation_func = None
+
+    dataset_name = "two_sigma_connect"
+    data_preparation_func = prepare_two_sigma_connect_data
+
+    X, y = load_dataset(dataset_name)
     n_samples, n_features = X.shape
     n_classes = len(y.unique())
 
+    multiprocess = True
     n_splits = 100
     # for model_type in ["xgboost", "student_nn", "vanilla_nn"]:
     for model_type in ["xgboost", "vanilla_nn", "student_nn"]:
+    # for model_type in ["student_nn"]:
 
         if model_type == "vanilla_nn":
             fn_kwargs = {
                 "n_classes": n_classes,
                 "n_features": n_features,
-                "epochs": 15
+                "epochs": 15,
+                "data_preparation_func": data_preparation_func
             }
             train_and_evaluate_fn = train_and_evaluate_vanilla_nn
 
@@ -202,7 +230,8 @@ def example_cross_validation() -> None:
             fn_kwargs = {
                 "max_depth": 10,
                 "n_estimators": 30,
-                "learning_rate": 0.1
+                "learning_rate": 0.1,
+                "data_preparation_func": data_preparation_func
             }
             train_and_evaluate_fn = train_and_evaluate_xgboost
 
@@ -210,11 +239,12 @@ def example_cross_validation() -> None:
             fn_kwargs = {
                 "n_classes": n_classes,
                 "n_features": n_features,
-                "n_shap_features": 10,
+                "n_shap_features": 5,
                 "epochs": 15,
                 "xgb_max_depth": 10,
                 "xgb_n_estimators": 30,
-                "xgb_learning_rate": 0.1
+                "xgb_learning_rate": 0.1,
+                "data_preparation_func": data_preparation_func
             }
             train_and_evaluate_fn = train_and_evaluate_student_nn
 
@@ -226,7 +256,7 @@ def example_cross_validation() -> None:
                                      train_and_evaluate_fn=train_and_evaluate_fn,
                                      fn_kwargs=fn_kwargs,
                                      n_splits=n_splits,
-                                     multiprocess=False,
+                                     multiprocess=multiprocess,
                                      tqdm_description=model_type)
 
         print(scores_df)
@@ -238,13 +268,9 @@ def example_cross_validation() -> None:
         scores_df.to_csv(scores_path)
 
         fn_kwargs_path = osp.join(results_dir, "fn_kwargs.json")
+        fn_kwargs_to_dump = {k: v for k, v in fn_kwargs.items() if k != "data_preparation_func"}
         with open(fn_kwargs_path, 'w') as f:
-            json.dump(fn_kwargs, f, indent=2)
-
-            # hist_path = osp.join(results_dir, "scores_hist.png")
-            # plt.figure()
-            # scores_df.hist()
-            # plt.savefig(hist_path)
+            json.dump(fn_kwargs_to_dump, f, indent=2)
 
 
 if __name__ == '__main__':
